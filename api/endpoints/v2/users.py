@@ -7,7 +7,7 @@ from schemas.user import User, UserCreate, UserUpdate
 from schemas.response import StandardResponse, PaginatedResponse
 import crud.user as crud
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(prefix="/v2/users", tags=["users-v2"])
 
 
 @router.post("/", response_model=StandardResponse, status_code=status.HTTP_201_CREATED)

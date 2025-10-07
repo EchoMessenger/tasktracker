@@ -8,7 +8,7 @@ from schemas.response import StandardResponse, PaginatedResponse
 import crud.task as task_crud
 import crud.user as user_crud
 
-router = APIRouter(prefix="/tasks", tags=["tasks"])
+router = APIRouter(prefix="/v1/tasks", tags=["tasks-v1"])
 
 
 def get_current_user():

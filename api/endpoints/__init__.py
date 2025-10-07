@@ -1,4 +1,8 @@
-from .users import router as users_router
-from .tasks import router as tasks_router
+from .v1 import users_router as v1_users_router, tasks_router as v1_tasks_router
+from .v2 import users_router as v2_users_router
 
-__all__ = ["users_router", "tasks_router"]
+__all__ = [
+    "v1_users_router",
+    "v1_tasks_router",
+    "v2_users_router"
+]
