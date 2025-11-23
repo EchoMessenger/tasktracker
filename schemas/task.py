@@ -1,13 +1,14 @@
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, validator, Field
 from datetime import datetime
 from typing import List, Optional
-from .user import User
-
+from models.task import TaskStatus
+from schemas.user import UserResponse
 
 class TaskBase(BaseModel):
-    title: str
+    title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
     due_date: Optional[datetime] = None
+    assigned_user_ids: List[int] = Field(default_factory=list)
 
     @validator('title')
     def title_not_empty(cls, v):
@@ -15,46 +16,30 @@ class TaskBase(BaseModel):
             raise ValueError('Title cannot be empty')
         return v.strip()
 
-
 class TaskCreate(TaskBase):
-    assigned_user_ids: Optional[List[int]] = None
-
+    creator_id: int = Field(..., description="ID пользователя-создателя задачи")
 
 class TaskUpdate(BaseModel):
-    title: Optional[str] = None
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
     description: Optional[str] = None
     due_date: Optional[datetime] = None
-    status: Optional[str] = None
+    status: Optional[TaskStatus] = None
     assigned_user_ids: Optional[List[int]] = None
 
-    @validator('status')
-    def status_validator(cls, v):
-        if v is not None:
-            valid_statuses = ['open', 'in_progress', 'review', 'completed']
-            if v not in valid_statuses:
-                raise ValueError(f'Status must be one of: {", ".join(valid_statuses)}')
-        return v
-
-
 class TaskStatusUpdate(BaseModel):
-    status: str
+    status: TaskStatus
 
-    @validator('status')
-    def valid_status(cls, v):
-        valid_statuses = ['open', 'in_progress', 'review', 'completed']
-        if v not in valid_statuses:
-            raise ValueError(f'Status must be one of: {", ".join(valid_statuses)}')
-        return v
-
-
-class Task(TaskBase):
+class TaskResponse(TaskBase):
     id: int
-    status: str
+    status: TaskStatus
+    creator_id: int
     created_at: datetime
     updated_at: datetime
-    creator_id: int
-    creator: Optional[User] = None
-    assigned_users: List[User] = []
+    creator: Optional[UserResponse] = None
+    assigned_users: List[UserResponse] = []
 
     class Config:
         from_attributes = True
+
+class Task(TaskResponse):
+    pass

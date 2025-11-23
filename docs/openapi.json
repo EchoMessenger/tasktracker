@@ -80,6 +80,42 @@
               "title": "Limit"
             },
             "description": "Number of records to return"
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/UserRole"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by role",
+              "title": "Role"
+            },
+            "description": "Filter by role"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Search in username and full name",
+              "title": "Search"
+            },
+            "description": "Search in username and full name"
           }
         ],
         "responses": {
@@ -88,7 +124,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaginatedResponse_User_"
+                  "$ref": "#/components/schemas/PaginatedResponse_UserResponse_"
                 }
               }
             }
@@ -215,62 +251,6 @@
               "type": "integer",
               "title": "User Id"
             }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StandardResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/users/authenticate": {
-      "post": {
-        "tags": [
-          "users-v1"
-        ],
-        "summary": "Authenticate User",
-        "description": "Аутентификация пользователя по username",
-        "operationId": "authenticate_user_v1_users_authenticate_post",
-        "parameters": [
-          {
-            "name": "username",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Username",
-              "title": "Username"
-            },
-            "description": "Username"
-          },
-          {
-            "name": "password",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Password",
-              "title": "Password"
-            },
-            "description": "Password"
           }
         ],
         "responses": {
@@ -434,7 +414,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaginatedResponse_Task_"
+                  "$ref": "#/components/schemas/PaginatedResponse_TaskResponse_"
                 }
               }
             }
@@ -745,7 +725,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaginatedResponse_Task_"
+                  "$ref": "#/components/schemas/PaginatedResponse_TaskResponse_"
                 }
               }
             }
@@ -1250,7 +1230,7 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "PaginatedResponse_Task_": {
+      "PaginatedResponse_TaskResponse_": {
         "properties": {
           "success": {
             "type": "boolean",
@@ -1263,12 +1243,13 @@
           },
           "data": {
             "items": {
-              "$ref": "#/components/schemas/Task"
+              "$ref": "#/components/schemas/TaskResponse"
             },
             "type": "array",
             "title": "Data"
           },
           "pagination": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Pagination"
           },
@@ -1283,7 +1264,43 @@
           "message",
           "data"
         ],
-        "title": "PaginatedResponse[Task]"
+        "title": "PaginatedResponse[TaskResponse]"
+      },
+      "PaginatedResponse_UserResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/UserResponse"
+            },
+            "type": "array",
+            "title": "Data"
+          },
+          "pagination": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Pagination"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "data"
+        ],
+        "title": "PaginatedResponse[UserResponse]"
       },
       "PaginatedResponse_User_": {
         "properties": {
@@ -1304,6 +1321,7 @@
             "title": "Data"
           },
           "pagination": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Pagination"
           },
@@ -1353,91 +1371,12 @@
         "title": "StandardResponse",
         "description": "Стандартный ответ для успешных операций"
       },
-      "Task": {
-        "properties": {
-          "title": {
-            "type": "string",
-            "title": "Title"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "due_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Due Date"
-          },
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          },
-          "creator_id": {
-            "type": "integer",
-            "title": "Creator Id"
-          },
-          "creator": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/User"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "assigned_users": {
-            "items": {
-              "$ref": "#/components/schemas/User"
-            },
-            "type": "array",
-            "title": "Assigned Users",
-            "default": []
-          }
-        },
-        "type": "object",
-        "required": [
-          "title",
-          "id",
-          "status",
-          "created_at",
-          "updated_at",
-          "creator_id"
-        ],
-        "title": "Task"
-      },
       "TaskCreate": {
         "properties": {
           "title": {
             "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
             "title": "Title"
           },
           "description": {
@@ -1464,31 +1403,129 @@
             "title": "Due Date"
           },
           "assigned_user_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Assigned User Ids"
+          },
+          "creator_id": {
+            "type": "integer",
+            "title": "Creator Id",
+            "description": "ID пользователя-создателя задачи"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "creator_id"
+        ],
+        "title": "TaskCreate"
+      },
+      "TaskResponse": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "description": {
             "anyOf": [
               {
-                "items": {
-                  "type": "integer"
-                },
-                "type": "array"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
+            "title": "Description"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "assigned_user_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
             "title": "Assigned User Ids"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "creator_id": {
+            "type": "integer",
+            "title": "Creator Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "creator": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "assigned_users": {
+            "items": {
+              "$ref": "#/components/schemas/UserResponse"
+            },
+            "type": "array",
+            "title": "Assigned Users",
+            "default": []
           }
         },
         "type": "object",
         "required": [
-          "title"
+          "title",
+          "id",
+          "status",
+          "creator_id",
+          "created_at",
+          "updated_at"
         ],
-        "title": "TaskCreate"
+        "title": "TaskResponse"
+      },
+      "TaskStatus": {
+        "type": "string",
+        "enum": [
+          "open",
+          "in_progress",
+          "review",
+          "completed"
+        ],
+        "title": "TaskStatus",
+        "description": "Статусы задач"
       },
       "TaskStatusUpdate": {
         "properties": {
           "status": {
-            "type": "string",
-            "title": "Status"
+            "$ref": "#/components/schemas/TaskStatus"
           }
         },
         "type": "object",
@@ -1502,7 +1539,9 @@
           "title": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
               },
               {
                 "type": "null"
@@ -1536,13 +1575,12 @@
           "status": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/TaskStatus"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Status"
+            ]
           },
           "assigned_user_ids": {
             "anyOf": [
@@ -1566,18 +1604,24 @@
         "properties": {
           "username": {
             "type": "string",
+            "maxLength": 50,
+            "minLength": 3,
             "title": "Username"
           },
           "full_name": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100
               },
               {
                 "type": "null"
               }
             ],
             "title": "Full Name"
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
           },
           "id": {
             "type": "integer",
@@ -1592,6 +1636,7 @@
         "type": "object",
         "required": [
           "username",
+          "role",
           "id",
           "created_at"
         ],
@@ -1601,12 +1646,15 @@
         "properties": {
           "username": {
             "type": "string",
+            "maxLength": 50,
+            "minLength": 3,
             "title": "Username"
           },
           "full_name": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100
               },
               {
                 "type": "null"
@@ -1614,24 +1662,30 @@
             ],
             "title": "Full Name"
           },
-          "password": {
-            "type": "string",
-            "title": "Password"
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
           }
         },
         "type": "object",
         "required": [
           "username",
-          "password"
+          "role"
         ],
         "title": "UserCreate"
       },
-      "UserUpdate": {
+      "UserResponse": {
         "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 3,
+            "title": "Username"
+          },
           "full_name": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100
               },
               {
                 "type": "null"
@@ -1639,16 +1693,64 @@
             ],
             "title": "Full Name"
           },
-          "password": {
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "role",
+          "id",
+          "created_at"
+        ],
+        "title": "UserResponse"
+      },
+      "UserRole": {
+        "type": "string",
+        "enum": [
+          "user",
+          "manager",
+          "admin"
+        ],
+        "title": "UserRole",
+        "description": "Роли пользователей в системе"
+      },
+      "UserUpdate": {
+        "properties": {
+          "username": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 3
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Password"
+            "title": "Username"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
           }
         },
         "type": "object",

@@ -1,11 +1,12 @@
+import enum
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum, Text
 from sqlalchemy.orm import relationship
 import datetime
-import enum
 from database import Base
 
 
 class TaskStatus(enum.Enum):
+    """Статусы задач"""
     OPEN = "open"
     IN_PROGRESS = "in_progress"
     REVIEW = "review"
@@ -21,15 +22,9 @@ class TaskDB(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     due_date = Column(DateTime, nullable=True)
-    status = Column(Enum(TaskStatus), default=TaskStatus.OPEN)
-
-    # Создатель задачи
+    status = Column(Enum(TaskStatus), default=TaskStatus.OPEN)  # Используем Enum(TaskStatus)
     creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-
-    # Связи
     creator = relationship("UserDB", back_populates="created_tasks")
-
-    # Иерархия задач (родительские связи)
     parent_relations = relationship(
         "TaskHierarchyDB",
         foreign_keys="TaskHierarchyDB.child_id",
@@ -40,8 +35,6 @@ class TaskDB(Base):
         foreign_keys="TaskHierarchyDB.parent_id",
         back_populates="parent_task"
     )
-
-    # Назначения на пользователей
     assignments = relationship("TaskAssignmentDB", back_populates="task", cascade="all, delete-orphan")
 
     def __repr__(self):

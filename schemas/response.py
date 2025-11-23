@@ -4,7 +4,6 @@ from datetime import datetime
 
 T = TypeVar('T')
 
-
 class StandardResponse(BaseModel):
     """Стандартный ответ для успешных операций"""
     success: bool = True
@@ -37,7 +36,9 @@ class PaginatedResponse(BaseModel, Generic[T]):
             "total": 0,
             "page": 1,
             "size": 100,
-            "pages": 1
+            "pages": 1,
+            "has_next": False,
+            "has_prev": False
         }
     )
     timestamp: datetime = Field(default_factory=datetime.now)
@@ -85,3 +86,22 @@ class HealthCheckResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# Дополнительные утилиты для удобства
+class SuccessResponse(StandardResponse):
+    """Упрощенный ответ для успешных операций без данных"""
+    def __init__(self, message: str = "Operation completed successfully"):
+        super().__init__(message=message, data=None)
+
+
+class CreatedResponse(StandardResponse):
+    """Ответ для успешного создания ресурса"""
+    def __init__(self, message: str = "Resource created successfully", data: Any = None):
+        super().__init__(message=message, data=data)
+
+
+class DeletedResponse(StandardResponse):
+    """Ответ для успешного удаления ресурса"""
+    def __init__(self, message: str = "Resource deleted successfully"):
+        super().__init__(message=message, data=None)
