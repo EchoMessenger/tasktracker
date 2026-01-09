@@ -27,3 +27,8 @@
 
 После запуска откройте: http://localhost:8000/docs
 
+
+# API документация
+
+https://echomessenger.github.io/tasktracker/
+
