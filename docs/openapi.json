@@ -1722,8 +1722,7 @@
           "manager",
           "admin"
         ],
-        "title": "UserRole",
-        "description": "Роли пользователей в системе"
+        "title": "UserRole"
       },
       "UserUpdate": {
         "properties": {
