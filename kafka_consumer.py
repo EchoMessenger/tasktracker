@@ -9,7 +9,6 @@ import os
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 class KafkaConsumer:
     def __init__(self, db_session_getter: Callable[[], Session]):
         bootstrap_servers = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
