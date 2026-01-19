@@ -140,13 +140,13 @@ def get_tasks_count(
     return query.count()
 
 
-def create_task(db: Session, task: TaskCreate) -> TaskDB:  # Убрали creator_id из параметров
+def create_task(db: Session, task: TaskCreate) -> TaskDB:
     """Создать новую задачу"""
     db_task = TaskDB(
         title=task.title,
         description=task.description,
         due_date=task.due_date,
-        creator_id=task.creator_id,  # Берем из схемы task
+        creator_id=task.creator_id,
         status=TaskStatus.OPEN
     )
     db.add(db_task)

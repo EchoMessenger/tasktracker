@@ -16,14 +16,15 @@ class TaskStatus(enum.Enum):
 class TaskDB(Base):
     __tablename__ = "tasks"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     title = Column(String(200), nullable=False)
     description = Column(Text)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     due_date = Column(DateTime, nullable=True)
-    status = Column(Enum(TaskStatus), default=TaskStatus.OPEN)  # Используем Enum(TaskStatus)
-    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    status = Column(Enum(TaskStatus), default=TaskStatus.OPEN, index=True)
+    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    creator = relationship("UserDB", back_populates="creators")
     creator = relationship("UserDB", back_populates="created_tasks")
     parent_relations = relationship(
         "TaskHierarchyDB",
@@ -44,7 +45,7 @@ class TaskDB(Base):
 class TaskHierarchyDB(Base):
     __tablename__ = "task_hierarchy"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     parent_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
     child_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
@@ -60,7 +61,7 @@ class TaskHierarchyDB(Base):
 class TaskAssignmentDB(Base):
     __tablename__ = "task_assignments"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     assigned_at = Column(DateTime, default=datetime.datetime.utcnow)
