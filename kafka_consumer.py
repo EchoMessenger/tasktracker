@@ -48,6 +48,7 @@ class KafkaConsumer:
             logger.error(f"Failed to start Kafka consumer: {e}")
             self.running = False
 
+
     def stop(self):
         """Остановка потребителя"""
         self.running = False
