@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 class KafkaConsumer:
     def __init__(self, db_session_getter: Callable[[], Session]):
-        # Получаем настройки из переменных окружения
         bootstrap_servers = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
         group_id = os.getenv('KAFKA_GROUP_ID', 'fastapi-user-sync-consumer')
         topic = os.getenv('KAFKA_TOPIC', 'tinode.account-events')
@@ -36,13 +35,6 @@ class KafkaConsumer:
         self.thread = None
         self.topic = topic
 
-    # def start(self):
-    #     """Запуск потребителя в отдельном потоке"""
-    #     self.consumer.subscribe(['tinode.account-events'])
-    #     self.running = True
-    #     self.thread = Thread(target=self._consume_loop, daemon=True)
-    #     self.thread.start()
-    #     logging.info("Kafka consumer started (read-only mode)")
     def start(self):
         """Запуск потребителя в отдельном потоке"""
         try:
@@ -50,10 +42,10 @@ class KafkaConsumer:
             self.running = True
             self.thread = Thread(target=self._consume_loop, daemon=True, name="KafkaConsumer")
             self.thread.start()
-            logger.info(f"✓ Kafka consumer started for topic '{self.topic}'")
-            logger.info(f"  Connecting to: {self.config['bootstrap.servers']}")
+            logger.info(f"Kafka consumer started for topic '{self.topic}'")
+            logger.info(f"Connecting to: {self.config['bootstrap.servers']}")
         except Exception as e:
-            logger.error(f"✗ Failed to start Kafka consumer: {e}")
+            logger.error(f"Failed to start Kafka consumer: {e}")
             self.running = False
 
     def stop(self):
@@ -77,11 +69,8 @@ class KafkaConsumer:
                         continue
                     logging.error(f"Kafka error: {msg.error()}")
                     continue
-
-                # Обработка сообщения
                 self._process_message(msg.value())
                 self.consumer.commit(msg)
-
             except Exception as e:
                 logging.error(f"Error in consumer loop: {e}")
 
@@ -92,15 +81,10 @@ class KafkaConsumer:
             event_type = message.get('event_type')
             user_data = message.get('data', {})
             source = message.get('source', '')
-
-            # Пропускаем события от нашего же сервиса (если такие есть)
             if source == 'fastapi-user-service':
                 logging.debug(f"Skipping self-generated event: {event_type}")
                 return
-
-            # Получаем сессию БД
             db = self.db_session_getter()
-
             try:
                 if event_type == 'account_created':
                     self._handle_account_created(db, user_data)
@@ -110,7 +94,6 @@ class KafkaConsumer:
                     self._handle_account_deleted(db, user_data)
                 else:
                     logging.warning(f"Unknown event type: {event_type}")
-
                 db.commit()
             except Exception as e:
                 db.rollback()
@@ -126,56 +109,43 @@ class KafkaConsumer:
     def _handle_account_created(self, db: Session, user_data: dict):
         """Создание пользователя из события Kafka (только если его нет)"""
         from models.user import UserDB, UserRole
-
         user_id = user_data.get('user_id')
         username = user_data.get('username')
-
         if not user_id or not username:
             logging.error("Missing user_id or username in create event")
             return
-
-        # Проверяем по user_id (первичный ключ из Tinode)
         existing = db.query(UserDB).filter(UserDB.id == user_id).first()
         if existing:
             logging.debug(f"User {user_id} already exists, skipping create")
             return
-
-        # Проверяем по username
         existing_by_name = db.query(UserDB).filter(UserDB.username == username).first()
         if existing_by_name:
             logging.warning(f"Username {username} exists with different ID, updating ID")
-            existing_by_name.id = user_id  # Обновляем ID если username совпадает
+            existing_by_name.id = user_id
             return
-
-        # Создаем нового пользователя
         new_user = UserDB(
-            id=user_id,  # Используем ID из Tinode!
+            id=user_id,
             username=username,
             full_name=user_data.get('full_name', ''),
             role=UserRole(user_data.get('role', 'user')),
             created_at=datetime.fromisoformat(user_data['created_at'])
             if 'created_at' in user_data else datetime.utcnow()
         )
-
         db.add(new_user)
         logging.info(f"Created user from Kafka: {username} (ID: {user_id})")
 
     def _handle_account_updated(self, db: Session, user_data: dict):
         """Обновление пользователя из события Kafka"""
         from models.user import UserDB, UserRole
-
         user_id = user_data.get('user_id')
         if not user_id:
             logging.error("No user_id in update event")
             return
-
         user = db.query(UserDB).filter(UserDB.id == user_id).first()
         if not user:
-            logging.warning(f"User {user_id} not found for update, creating...")
+            logging.warning(f"User {user_id} not found for update, creating")
             self._handle_account_created(db, user_data)
             return
-
-        # Обновляем поля
         if 'username' in user_data:
             user.username = user_data['username']
         if 'full_name' in user_data:
@@ -191,16 +161,13 @@ class KafkaConsumer:
     def _handle_account_deleted(self, db: Session, user_data: dict):
         """Удаление пользователя из события Kafka"""
         from models.user import UserDB
-
         user_id = user_data.get('user_id')
         if not user_id:
             logging.error("No user_id in delete event")
             return
-
         user = db.query(UserDB).filter(UserDB.id == user_id).first()
         if not user:
             logging.warning(f"User {user_id} not found for deletion")
             return
-
         db.delete(user)
         logging.info(f"Deleted user from Kafka: {user.username} (ID: {user_id})")
