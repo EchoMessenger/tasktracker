@@ -27,7 +27,7 @@ jobs:
 
     - name: Run unit tests with SQLite
       env:
-        DATABASE_URL: sqlite:///:memory:
+        DATABASE_URL: "sqlite:///:memory:"
         TESTING: "true"
       run: |
         pytest tests/unit/ -v --cov=. --cov-report=xml
