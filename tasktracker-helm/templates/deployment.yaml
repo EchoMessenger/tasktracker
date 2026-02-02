@@ -1,0 +1,142 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tasktracker.fullname" . }}
+  labels:
+    {{- include "tasktracker.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "tasktracker.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tasktracker.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.openbao.enabled }}
+      serviceAccountName: {{ include "tasktracker.serviceAccountName" . }}
+      {{- end }}
+
+      {{- if .Values.openbao.enabled }}
+      imagePullSecrets:
+        - name: ghcr-secret
+      {{- end }}
+
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          ports:
+            - containerPort: {{ .Values.service.port }}
+              name: http
+
+          envFrom:
+            - configMapRef:
+                name: {{ include "tasktracker.fullname" . }}
+
+          env:
+            # Database configuration
+            - name: DATABASE_URL
+              value: "postgresql://{{ .Values.database.username }}:$(DATABASE_PASSWORD)@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}?sslmode={{ .Values.database.sslmode }}"
+
+            # Database password (from ExternalSecret)
+            {{- if .Values.openbao.enabled }}
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tasktracker.fullname" . }}-database
+                  key: password
+            {{- end }}
+
+            # Kafka SASL configuration
+            {{- if .Values.openbao.enabled }}
+            - name: KAFKA_SASL_ENABLE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tasktracker.fullname" . }}-kafka-sasl
+                  key: ENABLE
+              optional: true
+
+            - name: KAFKA_SASL_MECHANISM
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tasktracker.fullname" . }}-kafka-sasl
+                  key: MECHANISM
+              optional: true
+
+            - name: KAFKA_SASL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tasktracker.fullname" . }}-kafka-user
+                  key: username
+              optional: true
+
+            - name: KAFKA_SASL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tasktracker.fullname" . }}-kafka-user
+                  key: password
+              optional: true
+
+            - name: KAFKA_TLS_ENABLE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tasktracker.fullname" . }}-kafka-tls
+                  key: ENABLE
+              optional: true
+
+            - name: KAFKA_TLS_INSECURE_SKIP_VERIFY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tasktracker.fullname" . }}-kafka-tls
+                  key: INSECURE_SKIP_VERIFY
+              optional: true
+            {{- end }}
+
+          # Health checks
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.healthChecks.liveness.path | default "/health" }}
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: {{ .Values.healthChecks.liveness.initialDelaySeconds | default 30 }}
+            periodSeconds: {{ .Values.healthChecks.liveness.periodSeconds | default 10 }}
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.healthChecks.readiness.path | default "/health" }}
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: {{ .Values.healthChecks.readiness.initialDelaySeconds | default 5 }}
+            periodSeconds: {{ .Values.healthChecks.readiness.periodSeconds | default 5 }}
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          # Resources
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+
+          # Volume mounts
+          volumeMounts:
+            {{- if .Values.volumes.docs.enabled }}
+            - name: docs
+              mountPath: /app/docs
+            {{- end }}
+            {{- if .Values.volumes.logs.enabled }}
+            - name: logs
+              mountPath: /app/logs
+            {{- end }}
+
+      # Volumes
+      volumes:
+        {{- if .Values.volumes.docs.enabled }}
+        - name: docs
+          emptyDir: {}
+        {{- end }}
+        {{- if .Values.volumes.logs.enabled }}
+        - name: logs
+          emptyDir:
+            sizeLimit: {{ .Values.volumes.logs.size }}
+        {{- end }}

@@ -63,14 +63,15 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://postgres:1363@db:5432/tasktracker
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+#      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_BOOTSTRAP_SERVERS=external-kafka-host:9092
       - KAFKA_TOPIC=tinode.account-events
       - KAFKA_GROUP_ID=fastapi-user-sync-consumer
     depends_on:
       db:
         condition: service_healthy
-      kafka:
-        condition: service_started
+#      kafka:
+#        condition: service_started
     volumes:
       - ./docs:/app/docs
       - ./logs:/app/logs

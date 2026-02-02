@@ -41,7 +41,7 @@ def create_tables(engine):
     try:
         from models.task import TaskDB
     except ImportError:
-        pass
+        print(f"Не удалось импортировать TaskDB: {e}")
 
     Base.metadata.create_all(bind=engine)
     yield
