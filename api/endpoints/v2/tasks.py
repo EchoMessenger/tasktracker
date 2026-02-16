@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import logging
+logger = logging.getLogger(__name__)
 from auth import current_user_auth
 
 from database import get_db
 from models import UserDB, TaskDB
-from models.task import TaskStatus
+from models.task import TaskStatus, TaskHierarchyDB, TaskAssignmentDB
 from schemas.task import TaskResponse, TaskCreate, TaskUpdate, TaskStatusUpdate  # Используем TaskResponse вместо Task
 from schemas.response import StandardResponse, PaginatedResponse
 import crud.task as task_crud
@@ -54,6 +56,56 @@ def create_task(
     )
 
 
+# @router.post("/{parent_id}/subtasks", response_model=StandardResponse, status_code=status.HTTP_201_CREATED)
+# def create_subtask(
+#         parent_id: int,
+#         subtask: TaskCreate,
+#         db: Session = Depends(get_db)
+# ):
+#     """Создать подзадачу для указанной родительской задачи"""
+#     creator = user_crud.get_user(db, subtask.creator_id)
+#     if not creator:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail=f"Creator user with id {subtask.creator_id} not found"
+#         )
+#     if not creator.can_create_task():
+#         raise HTTPException(
+#             status_code=status.HTTP_403_FORBIDDEN,
+#             detail=f"User with role '{creator.role.value}' cannot create tasks"
+#         )
+#     parent_task = task_crud.get_task(db, parent_id)
+#     if not parent_task:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail=f"Parent task with id {parent_id} not found"
+#         )
+#     parent_assigned_users = task_crud.get_assigned_users(db, parent_id)
+#     parent_user_ids = [user.id for user in parent_assigned_users]
+#     for user_id in parent_user_ids:
+#         if not user_crud.get_user(db, user_id):
+#             raise HTTPException(
+#                 status_code=status.HTTP_404_NOT_FOUND,
+#                 detail=f"User with id {user_id} from parent task not found"
+#             )
+#     subtask_data = subtask.dict()
+#     subtask_data["parent_id"] = parent_id
+#     subtask_data["assigned_user_ids"] = parent_user_ids
+#     subtask_created = task_crud.create_task(db=db, task=TaskCreate(**subtask_data))
+#     hierarchy = task_crud.create_task_hierarchy(db, parent_id, subtask_created.id)
+#     if not hierarchy:
+#         db.rollback()
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="Cannot create task hierarchy - would create cycle or invalid relationship"
+#         )
+    # subtask_with_hierarchy = task_crud.get_task(db, subtask_created.id)
+    #
+    # return StandardResponse(
+    #     message="Subtask created successfully",
+    #     data=task_crud.task_to_dict(subtask_with_hierarchy) if subtask_with_hierarchy else subtask_created
+    # )
+
 @router.post("/{parent_id}/subtasks", response_model=StandardResponse, status_code=status.HTTP_201_CREATED)
 def create_subtask(
         parent_id: int,
@@ -72,12 +124,14 @@ def create_subtask(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"User with role '{creator.role.value}' cannot create tasks"
         )
+
     parent_task = task_crud.get_task(db, parent_id)
     if not parent_task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Parent task with id {parent_id} not found"
         )
+
     parent_assigned_users = task_crud.get_assigned_users(db, parent_id)
     parent_user_ids = [user.id for user in parent_assigned_users]
     for user_id in parent_user_ids:
@@ -86,23 +140,69 @@ def create_subtask(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"User with id {user_id} from parent task not found"
             )
-    subtask_data = subtask.dict()
+    subtask_data = subtask.model_dump()
     subtask_data["parent_id"] = parent_id
     subtask_data["assigned_user_ids"] = parent_user_ids
-    subtask_created = task_crud.create_task(db=db, task=TaskCreate(**subtask_data))
-    hierarchy = task_crud.create_task_hierarchy(db, parent_id, subtask_created.id)
-    if not hierarchy:
+    db_task = TaskDB(
+        title=subtask_data["title"],
+        description=subtask_data.get("description"),
+        due_date=subtask_data.get("due_date"),
+        creator_id=subtask_data["creator_id"],
+        status=TaskStatus.OPEN
+    )
+    db.add(db_task)
+    db.flush()
+    if subtask_data.get("assigned_user_ids"):
+        for user_id in subtask_data["assigned_user_ids"]:
+            assignment = TaskAssignmentDB(task_id=db_task.id, user_id=user_id)
+            db.add(assignment)
+    hierarchy = TaskHierarchyDB(parent_id=parent_id, child_id=db_task.id)
+    db.add(hierarchy)
+
+    try:
+        if not validate_hierarchy(db, parent_id, db_task.id):
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot create task hierarchy - would create cycle or invalid relationship"
+            )
+        db.commit()
+        db.refresh(db_task)
+
+    except Exception as e:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot create task hierarchy - would create cycle or invalid relationship"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create subtask: {str(e)}"
         )
-    subtask_with_hierarchy = task_crud.get_task(db, subtask_created.id)
+    created_task = task_crud.get_task(db, db_task.id)
 
     return StandardResponse(
-        message="Subtask created successfully",
-        data=task_crud.task_to_dict(subtask_with_hierarchy) if subtask_with_hierarchy else subtask_created
+        status="success",
+        data=task_crud.task_to_dict(created_task) if created_task else None,
+        message="Subtask created successfully"
     )
+
+
+def validate_hierarchy(db: Session, parent_id: int, child_id: int) -> bool:
+    """Валидация иерархии задач (проверка на циклы)"""
+    current = parent_id
+    visited = set()
+
+    while current:
+        if current in visited:
+            return False
+        visited.add(current)
+        parent_relations = db.query(TaskHierarchyDB).filter(
+            TaskHierarchyDB.child_id == current
+        ).all()
+
+        if not parent_relations:
+            break
+        current = parent_relations[0].parent_id
+        if current == child_id:
+            return False
+    return True
 
 @router.get("/", response_model=PaginatedResponse[TaskResponse])
 def read_tasks(
@@ -177,6 +277,52 @@ def update_task(
     )
 
 
+# @router.patch("/{task_id}/status", response_model=StandardResponse)
+# def update_task_status(
+#         task_id: int,
+#         status_update: TaskStatusUpdate,
+#         db: Session = Depends(get_db),
+#         current_user_id: int = Depends(get_current_user)
+# ):
+#     """Обновить статус задачи с автоматическим обновлением родительской задачи"""
+#     db_task = task_crud.update_task_status(
+#         db,
+#         task_id=task_id,
+#         new_status=status_update.status,
+#         current_user_id=current_user_id
+#     )
+#
+#     if db_task is None:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail="Task not found or not enough permissions"
+#         )
+#
+#     # Если задача переведена в статус "выполнено"
+#     if status_update.status == "completed":
+#         full_task = task_crud.get_task(db, task_id)
+#
+#         if full_task and full_task.parent_id:
+#             child_tasks = db.query(TaskDB).filter(
+#                 TaskDB.parent_id == full_task.parent_id
+#             ).all()
+#             all_children_completed = all(
+#                 task.status == TaskStatus.COMPLETED for task in child_tasks
+#             )
+#             if all_children_completed:
+#                 task_crud.update_task_status(
+#                     db,
+#                     task_id=full_task.parent_id,
+#                     new_status=TaskStatus.COMPLETED,
+#                     current_user_id=current_user_id
+#                 )
+#
+#     return StandardResponse(
+#         message="Task status updated successfully",
+#         data=db_task
+#     )
+
+
 @router.patch("/{task_id}/status", response_model=StandardResponse)
 def update_task_status(
         task_id: int,
@@ -197,32 +343,31 @@ def update_task_status(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Task not found or not enough permissions"
         )
-
-    # Если задача переведена в статус "выполнено"
-    if status_update.status == "completed":
+    if status_update.status == TaskStatus.COMPLETED:
         full_task = task_crud.get_task(db, task_id)
 
-        if full_task and full_task.parent_id:
-            child_tasks = db.query(TaskDB).filter(
-                TaskDB.parent_id == full_task.parent_id
-            ).all()
-            all_children_completed = all(
-                task.status == TaskStatus.COMPLETED for task in child_tasks
-            )
+        if full_task and hasattr(full_task, 'parent_id') and full_task.parent_id:
+            all_children_completed = task_crud.are_all_children_completed(db, full_task.parent_id)
+
             if all_children_completed:
-                task_crud.update_task_status(
+                parent_updated = task_crud.update_task_status(
                     db,
                     task_id=full_task.parent_id,
                     new_status=TaskStatus.COMPLETED,
                     current_user_id=current_user_id
                 )
 
+                # Если не удалось обновить родительскую задачу, логируем это
+                if not parent_updated:
+                    logger.warning(
+                        f"Parent task {full_task.parent_id} could not be updated to COMPLETED "
+                        f"by user {current_user_id} - insufficient permissions or task not found"
+                    )
+
     return StandardResponse(
         message="Task status updated successfully",
         data=db_task
     )
-
-
 @router.delete("/{task_id}", response_model=StandardResponse)
 def delete_task(
         task_id: int,
