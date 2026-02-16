@@ -169,12 +169,14 @@ def create_subtask(
         db.commit()
         db.refresh(db_task)
 
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create subtask: {str(e)}"
-        )
+        ) from e
     created_task = task_crud.get_task(db, db_task.id)
 
     return StandardResponse(
@@ -345,24 +347,25 @@ def update_task_status(
         )
     if status_update.status == TaskStatus.COMPLETED:
         full_task = task_crud.get_task(db, task_id)
-
-        if full_task and hasattr(full_task, 'parent_id') and full_task.parent_id:
-            all_children_completed = task_crud.are_all_children_completed(db, full_task.parent_id)
+        if full_task and full_task.parent_relations:
+            parent_id = full_task.parent_relations[0].parent_id
+            all_children_completed = task_crud.are_all_children_completed(db, parent_id)
 
             if all_children_completed:
                 parent_updated = task_crud.update_task_status(
                     db,
-                    task_id=full_task.parent_id,
+                    task_id=parent_id,
                     new_status=TaskStatus.COMPLETED,
                     current_user_id=current_user_id
                 )
 
-                # Если не удалось обновить родительскую задачу, логируем это
                 if not parent_updated:
                     logger.warning(
-                        f"Parent task {full_task.parent_id} could not be updated to COMPLETED "
+                        f"Parent task {parent_id} could not be updated to COMPLETED "
                         f"by user {current_user_id} - insufficient permissions or task not found"
                     )
+        else:
+            logger.debug(f"Task {task_id} has no parent relations, skipping cascade update")
 
     return StandardResponse(
         message="Task status updated successfully",
