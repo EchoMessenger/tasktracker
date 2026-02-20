@@ -50,9 +50,11 @@ def create_task(
                 )
 
     task_created = task_crud.create_task(db=db, task=task)
+    created_task = task_crud.get_task(db, task_created.id)
+
     return StandardResponse(
         message="Task created successfully",
-        data=task_created
+        data=task_crud.task_to_dict(created_task) if created_task else None
     )
 
 
@@ -180,30 +182,36 @@ def create_subtask(
     created_task = task_crud.get_task(db, db_task.id)
 
     return StandardResponse(
-        status="success",
         data=task_crud.task_to_dict(created_task) if created_task else None,
         message="Subtask created successfully"
     )
 
 
 def validate_hierarchy(db: Session, parent_id: int, child_id: int) -> bool:
-    """Валидация иерархии задач (проверка на циклы)"""
-    current = parent_id
-    visited = set()
+    """Валидация иерархии задач (проверка на циклы)."""
+    if parent_id == child_id:
+        return False
+    visited: set[int] = set()
+    queue: list[int] = [parent_id]
 
-    while current:
+    while queue:
+        current = queue.pop(0)
+
         if current in visited:
             return False
         visited.add(current)
+
         parent_relations = db.query(TaskHierarchyDB).filter(
             TaskHierarchyDB.child_id == current
         ).all()
 
-        if not parent_relations:
-            break
-        current = parent_relations[0].parent_id
-        if current == child_id:
-            return False
+        for relation in parent_relations:
+            ancestor_id = relation.parent_id
+            if ancestor_id == child_id:
+                return False
+            if ancestor_id not in visited:
+                queue.append(ancestor_id)
+
     return True
 
 @router.get("/", response_model=PaginatedResponse[TaskResponse])
@@ -273,9 +281,12 @@ def update_task(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Task not found"
         )
+
+    updated_task = task_crud.get_task(db, task_id)
+
     return StandardResponse(
         message="Task updated successfully",
-        data=db_task
+        data=task_crud.task_to_dict(updated_task) if updated_task else None
     )
 
 
@@ -324,7 +335,6 @@ def update_task(
 #         data=db_task
 #     )
 
-
 @router.patch("/{task_id}/status", response_model=StandardResponse)
 def update_task_status(
         task_id: int,
@@ -366,10 +376,11 @@ def update_task_status(
                     )
         else:
             logger.debug(f"Task {task_id} has no parent relations, skipping cascade update")
+    updated_task = task_crud.get_task(db, task_id)
 
     return StandardResponse(
         message="Task status updated successfully",
-        data=db_task
+        data=task_crud.task_to_dict(updated_task) if updated_task else None
     )
 @router.delete("/{task_id}", response_model=StandardResponse)
 def delete_task(
@@ -477,18 +488,75 @@ def get_tasks_stats(
     )
 
 
+# @router.post("/hierarchy/{parent_id}/{child_id}", response_model=StandardResponse)
+# def create_task_hierarchy(
+#         parent_id: int,
+#         child_id: int,
+#         db: Session = Depends(get_db)
+# ):
+#     """Создать связь родитель-потомок между задачами"""
+#     hierarchy = task_crud.create_task_hierarchy(db, parent_id, child_id)
+#     if not hierarchy:
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="Cannot create hierarchy - tasks not found or would create cycle"
+#         )
+#
+#     return StandardResponse(
+#         message="Task hierarchy created successfully",
+#         data=hierarchy
+#     )
 @router.post("/hierarchy/{parent_id}/{child_id}", response_model=StandardResponse)
 def create_task_hierarchy(
         parent_id: int,
         child_id: int,
-        db: Session = Depends(get_db)
+        db: Session = Depends(get_db),
+        current_user_id: int = Depends(get_current_user)
 ):
     """Создать связь родитель-потомок между задачами"""
+    # Проверяем существование обеих задач
+    parent_task = task_crud.get_task(db, parent_id)
+    if not parent_task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Parent task with id {parent_id} not found"
+        )
+
+    child_task = task_crud.get_task(db, child_id)
+    if not child_task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Child task with id {child_id} not found"
+        )
+    user = user_crud.get_user(db, current_user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User not found"
+        )
+
+    is_creator = (
+        parent_task.creator_id == current_user_id
+        or child_task.creator_id == current_user_id
+    )
+    if not is_creator and not user.can_delete_tasks():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to modify task hierarchy"
+        )
+
+    # Валидация на циклы — та же функция, что используется в create_subtask
+    if not validate_hierarchy(db, parent_id, child_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot create task hierarchy - would create cycle"
+        )
+
     hierarchy = task_crud.create_task_hierarchy(db, parent_id, child_id)
     if not hierarchy:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot create hierarchy - tasks not found or would create cycle"
+            detail="Cannot create hierarchy - relationship already exists or invalid"
         )
 
     return StandardResponse(
