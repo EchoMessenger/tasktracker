@@ -23,13 +23,12 @@ class TaskDB(Base):
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     due_date = Column(DateTime, nullable=True)
     status = Column(Enum(TaskStatus), default=TaskStatus.OPEN, index=True)
-    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    creator = relationship("UserDB", back_populates="creators")
+    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     creator = relationship("UserDB", back_populates="created_tasks")
     parent_relations = relationship(
         "TaskHierarchyDB",
         foreign_keys="TaskHierarchyDB.child_id",
-        back_populates="child_task"
+        back_populates="child_task",
     )
     child_relations = relationship(
         "TaskHierarchyDB",
@@ -45,12 +44,9 @@ class TaskDB(Base):
 class TaskHierarchyDB(Base):
     __tablename__ = "task_hierarchy"
 
-    id = Column(Integer, primary_key=True)
-    parent_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
-    child_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
+    parent_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True, nullable=False)
+    child_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
-
-    # Связи
     parent_task = relationship("TaskDB", foreign_keys=[parent_id], back_populates="child_relations")
     child_task = relationship("TaskDB", foreign_keys=[child_id], back_populates="parent_relations")
 
@@ -61,12 +57,9 @@ class TaskHierarchyDB(Base):
 class TaskAssignmentDB(Base):
     __tablename__ = "task_assignments"
 
-    id = Column(Integer, primary_key=True)
-    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    task_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, nullable=False)
     assigned_at = Column(DateTime, default=datetime.datetime.utcnow)
-
-    # Связи
     task = relationship("TaskDB", back_populates="assignments")
     user = relationship("UserDB", back_populates="assigned_tasks")
 

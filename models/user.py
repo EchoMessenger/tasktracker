@@ -15,11 +15,11 @@ class UserDB(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True)
-    username = Column(String(50), unique=True, index=True, nullable=False)
-    full_name = Column(String(100))
-    role = Column(Enum(UserRole), default=UserRole.USER, nullable=False, index=True)  # Используем Enum(UserRole)
+    username = Column(String(50), unique=True, nullable=False)
+    full_name = Column(String(200))
+    role = Column(Enum(UserRole), default=UserRole.USER, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    created_tasks = relationship("TaskDB", back_populates="creator", foreign_keys="TaskDB.creator_id", cascade="all, delete-orphan")
+    created_tasks = relationship("TaskDB", back_populates="creator", cascade="all, delete-orphan")
     assigned_tasks = relationship("TaskAssignmentDB", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):

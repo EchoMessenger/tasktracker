@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from database import engine, Base, SessionLocal
 from fastapi.middleware.cors import CORSMiddleware
-from api.endpoints import v1_users_router, v1_tasks_router, v2_users_router
+from api.endpoints import v1_users_router, v1_tasks_router, v2_users_router, v2_tasks_router
 import json
 import os
 import logging
@@ -62,6 +62,7 @@ app.add_middleware(
 app.include_router(v1_users_router)
 app.include_router(v1_tasks_router)
 app.include_router(v2_users_router)
+app.include_router(v2_tasks_router)
 
 @app.on_event("startup")
 def save_openapi_spec():
