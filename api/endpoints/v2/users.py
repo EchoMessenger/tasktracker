@@ -10,24 +10,6 @@ import crud.user as crud
 router = APIRouter(prefix="/v2/users", tags=["users-v2"])
 
 
-@router.post("/", response_model=StandardResponse, status_code=status.HTTP_201_CREATED)
-def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    """Создать нового пользователя"""
-    # Проверяем уникальность username (email больше не проверяем)
-    db_user = crud.get_user_by_username(db, username=user.username)
-    if db_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already registered"
-        )
-
-    user_created = crud.create_user(db=db, user=user)
-    return StandardResponse(
-        message="User created successfully",
-        data=user_created
-    )
-
-
 @router.get("/", response_model=PaginatedResponse[User])
 def read_users(
         skip: int = Query(0, ge=0, description="Number of records to skip"),
@@ -61,37 +43,6 @@ def read_user(user_id: int, db: Session = Depends(get_db)):
         message="User retrieved successfully",
         data=db_user
     )
-
-
-@router.put("/{user_id}", response_model=StandardResponse)
-def update_user(user_id: int, user: UserUpdate, db: Session = Depends(get_db)):
-    """Обновить данные пользователя"""
-    db_user = crud.update_user(db, user_id=user_id, user_update=user)
-    if db_user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    return StandardResponse(
-        message="User updated successfully",
-        data=db_user
-    )
-
-
-@router.delete("/{user_id}", response_model=StandardResponse)
-def delete_user(user_id: int, db: Session = Depends(get_db)):
-    """Удалить пользователя"""
-    success = crud.delete_user(db, user_id=user_id)
-    if not success:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    return StandardResponse(
-        message="User deleted successfully",
-        data=None
-    )
-
 
 @router.post("/authenticate", response_model=StandardResponse)
 def authenticate_user(
