@@ -196,15 +196,12 @@ def validate_hierarchy(db: Session, parent_id: int, child_id: int) -> bool:
 
     while queue:
         current = queue.pop(0)
-
         if current in visited:
-            return False
+            continue
         visited.add(current)
-
         parent_relations = db.query(TaskHierarchyDB).filter(
             TaskHierarchyDB.child_id == current
         ).all()
-
         for relation in parent_relations:
             ancestor_id = relation.parent_id
             if ancestor_id == child_id:
