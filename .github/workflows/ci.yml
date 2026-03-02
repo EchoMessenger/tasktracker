@@ -30,7 +30,7 @@ jobs:
         DATABASE_URL: "sqlite:///:memory:"
         TESTING: "true"
       run: |
-        pytest tests/unit/ -v --cov=. --cov-report=xml
+        pytest tests -v --cov=. --cov-report=xml
 
 #    - name: Check test coverage
 #      run: |
