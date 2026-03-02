@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 import logging
 logger = logging.getLogger(__name__)
-from auth import current_user_auth
+# from auth import current_user_auth
 
 from database import get_db
 from models import UserDB, TaskDB
