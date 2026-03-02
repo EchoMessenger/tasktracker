@@ -10,16 +10,21 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ["TESTING"] = "1"
 
+from main import app
+from database import get_db
+from crud import create_user
+from models.user import UserRole
+from schemas import UserCreate
+from api.endpoints.v2.tasks import get_current_user
+
 
 @pytest.fixture(scope="session")
 def test_database_url():
-    """URL тестовой базы данных"""
     return "sqlite:///:memory:"
 
 
 @pytest.fixture(scope="session")
 def engine(test_database_url):
-    """Движок тестовой БД"""
     engine = create_engine(
         test_database_url,
         connect_args={"check_same_thread": False},
@@ -31,16 +36,14 @@ def engine(test_database_url):
 
 @pytest.fixture(scope="session")
 def create_tables(engine):
-    """Создание таблиц перед всеми тестами"""
     from database import Base
     try:
         from models.user import UserDB
     except ImportError as e:
         print(f"Не удалось импортировать UserDB: {e}")
-
     try:
         from models.task import TaskDB
-    except ImportError:
+    except ImportError as e:
         print(f"Не удалось импортировать TaskDB: {e}")
 
     Base.metadata.create_all(bind=engine)
@@ -51,7 +54,6 @@ def create_tables(engine):
 
 @pytest.fixture
 def db_session(engine, create_tables) -> Generator[Session, None, None]:
-    """Фикстура для сессии БД с rollback после каждого теста"""
     connection = engine.connect()
     transaction = connection.begin()
     session = sessionmaker(bind=connection)()
@@ -63,9 +65,19 @@ def db_session(engine, create_tables) -> Generator[Session, None, None]:
         connection.close()
 
 
+@pytest.fixture(autouse=True)
+def override_db(db_session):
+    """Подменяет get_db — нужно для ВСЕХ тестов"""
+    def _get_test_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = _get_test_db
+    yield
+    app.dependency_overrides.pop(get_db, None)
+
+
 @pytest.fixture
 def sample_user_data():
-    """Тестовые данные пользователя"""
     return {
         "username": "testuser",
         "full_name": "Test User",

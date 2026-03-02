@@ -2,7 +2,8 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, desc, asc, func
 from typing import List, Optional
 import datetime
-
+import logging
+logger = logging.getLogger(__name__)
 from models.task import TaskDB, TaskHierarchyDB, TaskAssignmentDB, TaskStatus
 from models.user import UserDB, UserRole
 from schemas.task import TaskCreate, TaskUpdate
@@ -183,14 +184,16 @@ def update_task(db: Session, task_id: int, task_update: TaskUpdate, current_user
     return task_to_dict(db_task)
 
 
-def update_task_status(db: Session, task_id: int, new_status: TaskStatus, current_user_id: int) -> Optional[TaskDB]:
+def update_task_status(db: Session, task_id: int, new_status: TaskStatus, current_user_id: int) -> Optional[dict]:
     """Обновить статус задачи (могут создатель или назначенные)"""
     db_task = get_task(db, task_id)
     if not db_task:
         return None
     is_assigned = any(assignment.user_id == current_user_id for assignment in db_task.assignments)
     if db_task.creator_id != current_user_id and not is_assigned:
-        return None
+        user = db.query(UserDB).filter(UserDB.id == current_user_id).first()
+        if not user or user.role not in [UserRole.ADMIN, UserRole.MANAGER]:
+            return None
     db_task.status = new_status
     db_task.updated_at = datetime.datetime.utcnow()
     db.commit()
@@ -198,20 +201,81 @@ def update_task_status(db: Session, task_id: int, new_status: TaskStatus, curren
     return task_to_dict(db_task)
 
 
+def are_all_children_completed(db: Session, parent_id: int) -> bool:
+    """Проверить, все ли дочерние задачи родителя выполнены"""
+    child_relations = db.query(TaskHierarchyDB).filter(
+        TaskHierarchyDB.parent_id == parent_id
+    ).all()
+
+    if not child_relations:
+        return False
+    child_ids = [relation.child_id for relation in child_relations]
+    child_tasks = db.query(TaskDB).filter(TaskDB.id.in_(child_ids)).all()
+    return all(task.status == TaskStatus.COMPLETED for task in child_tasks)
+
+
+def update_task_status_with_cascade(
+        db: Session,
+        task_id: int,
+        new_status: TaskStatus,
+        current_user_id: int
+) -> Optional[dict]:
+    """Обновить статус задачи с каскадным обновлением родительской задачи"""
+    # Обновляем статус текущей задачи
+    updated_task = update_task_status(db, task_id, new_status, current_user_id)
+
+    if not updated_task:
+        return None
+    if new_status == TaskStatus.COMPLETED:
+        full_task = get_task(db, task_id)
+
+        if full_task and hasattr(full_task, 'parent_id') and full_task.parent_id:
+            if are_all_children_completed(db, full_task.parent_id):
+                parent_updated = update_task_status(
+                    db,
+                    task_id=full_task.parent_id,
+                    new_status=TaskStatus.COMPLETED,
+                    current_user_id=current_user_id
+                )
+
+                if not parent_updated:
+                    logger.warning(
+                        f"Parent task {full_task.parent_id} could not be auto-updated "
+                        f"by user {current_user_id}"
+                    )
+
+    return updated_task
+
+# def delete_task(db: Session, task_id: int) -> bool:
+#     """Удалить задачу"""
+#     db_task = get_task(db, task_id)
+#     if not db_task:
+#         return False
+#     db.query(TaskAssignmentDB).filter(TaskAssignmentDB.task_id == task_id).delete()
+#     db.query(TaskHierarchyDB).filter(
+#         or_(
+#             TaskHierarchyDB.parent_id == task_id,
+#             TaskHierarchyDB.child_id == task_id
+#         )
+#     ).delete()
+#
+#     db.delete(db_task)
+#     db.commit()
+#     return True
+
+
 def delete_task(db: Session, task_id: int) -> bool:
     """Удалить задачу"""
-    db_task = get_task(db, task_id)
-    if not db_task:
+    exists = db.query(TaskDB.id).filter(TaskDB.id == task_id).first()
+    if not exists:
         return False
-    db.query(TaskAssignmentDB).filter(TaskAssignmentDB.task_id == task_id).delete()
+    db.query(TaskAssignmentDB).filter(TaskAssignmentDB.task_id == task_id).delete(
+        synchronize_session=False
+    )
     db.query(TaskHierarchyDB).filter(
-        or_(
-            TaskHierarchyDB.parent_id == task_id,
-            TaskHierarchyDB.child_id == task_id
-        )
-    ).delete()
-
-    db.delete(db_task)
+        (TaskHierarchyDB.parent_id == task_id) | (TaskHierarchyDB.child_id == task_id)
+    ).delete(synchronize_session=False)
+    db.query(TaskDB).filter(TaskDB.id == task_id).delete(synchronize_session=False)
     db.commit()
     return True
 
