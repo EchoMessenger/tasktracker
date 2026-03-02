@@ -21,8 +21,10 @@ from crud.task import create_task as crud_create_task, get_task, task_to_dict
 @pytest.fixture
 def client():
     """Фикстура для тестового клиента"""
-    with TestClient(app) as test_client:
-        yield test_client
+    # with TestClient(app) as test_client:
+    #     yield test_client
+    test_client = TestClient(app)
+    yield test_client
 
 
 # УДАЛЕНА фикстура sample_user — используется из conftest.py (с ролью ADMIN)
