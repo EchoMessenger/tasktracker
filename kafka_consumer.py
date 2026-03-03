@@ -11,10 +11,15 @@ logger = logging.getLogger(__name__)
 
 class KafkaConsumer:
     def __init__(self, db_session_getter: Callable[[], Session]):
-        bootstrap_servers = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
+        bootstrap_servers = os.getenv('KAFKA_BROKERS', 'localhost:9092')
         group_id = os.getenv('KAFKA_GROUP_ID', 'fastapi-user-sync-consumer')
         topic = os.getenv('KAFKA_TOPIC', 'tinode.account-events')
 
+        sasl_enable = os.getenv('KAFKA_SASL_ENABLE', 'false').lower() == 'true'
+        tls_enable = os.getenv('KAFKA_TLS_ENABLE', 'false').lower() == 'true'
+
+        logger.info(f"KAFKA_SASL_ENABLE raw: '{os.getenv('KAFKA_SASL_ENABLE')}' -> parsed: {sasl_enable}")
+        logger.info(f"KAFKA_TLS_ENABLE raw: '{os.getenv('KAFKA_TLS_ENABLE')}' -> parsed: {tls_enable}")
         logger.info(f"Kafka configuration:")
         logger.info(f"  Bootstrap servers: {bootstrap_servers}")
         logger.info(f"  Group ID: {group_id}")
@@ -28,6 +33,30 @@ class KafkaConsumer:
             'session.timeout.ms': 6000,
             'max.poll.interval.ms': 300000,
         }
+
+        # SASL configuration
+        if sasl_enable:
+            sasl_mechanism = os.getenv('KAFKA_SASL_MECHANISM', 'SCRAM-SHA-512')
+            sasl_username = os.getenv('KAFKA_SASL_USERNAME', '')
+            sasl_password = os.getenv('KAFKA_SASL_PASSWORD', '')
+
+            if tls_enable:
+                self.config['security.protocol'] = 'SASL_SSL'
+            else:
+                self.config['security.protocol'] = 'SASL_PLAINTEXT'
+
+            self.config['sasl.mechanism'] = sasl_mechanism
+            self.config['sasl.username'] = sasl_username
+            self.config['sasl.password'] = sasl_password
+
+            tls_insecure = os.getenv('KAFKA_TLS_INSECURE_SKIP_VERIFY', 'false').lower() == 'true'
+            if tls_enable and tls_insecure:
+                self.config['enable.ssl.certificate.verification'] = False
+
+            logger.info(f"  SASL enabled: {sasl_mechanism}, user: {sasl_username}")
+
+        logger.info(f"Kafka full config: { {k: v for k, v in self.config.items() if k != 'sasl.password'} }")
+
         self.consumer = Consumer(self.config)
         self.db_session_getter = db_session_getter
         self.running = False
