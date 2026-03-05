@@ -17,3 +17,9 @@ data:
   DATABASE_NAME: {{ .Values.database.name | quote }}
   DATABASE_USERNAME: {{ .Values.database.username | quote }}
   DATABASE_SSLMODE: {{ .Values.database.sslmode | quote }}
+
+  KAFKA_SASL_ENABLE: {{ .Values.kafka.sasl.enabled | quote }}
+  KAFKA_SASL_MECHANISM: {{ .Values.kafka.sasl.mechanism | quote }}
+  KAFKA_SASL_USERNAME: {{ .Values.kafka.sasl.username | quote }}
+  KAFKA_TLS_ENABLE: {{ .Values.kafka.tls.enabled | quote }}
+  KAFKA_TLS_INSECURE_SKIP_VERIFY: {{ .Values.kafka.tls.insecureSkipVerify | quote }}

@@ -1,7 +1,7 @@
 image:
   repository: "ghcr.io/yooondooo/tasktracker"
   tag: "latest"
-  pullPolicy: "IfNotPresent"
+  pullPolicy: "Always"
 
 replicaCount: 1
 
@@ -10,28 +10,46 @@ service:
   type: ClusterIP
 
 database:
-  host: "postgres"
+  host: "tasktracker-tasktracker-postgres"
   port: 5432
   name: "tasktracker"
   username: "postgres"
   sslmode: "disable"
+  storage: "5Gi"
 
 kafka:
-  brokers: "kafka:9092"
+  brokers: "kafka-kafka-bootstrap.kafka.svc.cluster.local:9092"
   topic: "tinode.account-events"
   groupId: "fastapi-user-sync-consumer"
   clientId: "tasktracker"
+  sasl:
+    enabled: true
+    mechanism: SCRAM-SHA-512
+    username: "user"
+  tls:
+    enabled: false
+    insecureSkipVerify: false
 
 log:
   level: "info"
 
+healthChecks:
+  liveness:
+    path: "/health"
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readiness:
+    path: "/health"
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
 openbao:
   enabled: true
   path: "secret"
-  role: "router"
-  serviceAccount: "router-sa"
-  secretsPath: "secret/kafka"
-  databaseSecretsPath: "secret/tasktracker/postgres"
+  role: "tasktracker"
+  serviceAccount: "tasktracker-sa"
+  secretsPath: "kafka"
+  databaseSecretsPath: "tasktracker/postgres"
   registrySecretsPath: "registry/tasktracker/ghcr"
   resyncInterval: "10s"
 

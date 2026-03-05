@@ -38,8 +38,8 @@ spec:
 
           env:
             # Database configuration
-            - name: DATABASE_URL
-              value: "postgresql://{{ .Values.database.username }}:$(DATABASE_PASSWORD)@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}?sslmode={{ .Values.database.sslmode }}"
+#            - name: DATABASE_URL
+#              value: "postgresql://{{ .Values.database.username }}:$(DATABASE_PASSWORD)@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}?sslmode={{ .Values.database.sslmode }}"
 
             # Database password (from ExternalSecret)
             {{- if .Values.openbao.enabled }}
@@ -52,46 +52,11 @@ spec:
 
             # Kafka SASL configuration
             {{- if .Values.openbao.enabled }}
-            - name: KAFKA_SASL_ENABLE
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "tasktracker.fullname" . }}-kafka-sasl
-                  key: ENABLE
-              optional: true
-
-            - name: KAFKA_SASL_MECHANISM
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "tasktracker.fullname" . }}-kafka-sasl
-                  key: MECHANISM
-              optional: true
-
-            - name: KAFKA_SASL_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "tasktracker.fullname" . }}-kafka-user
-                  key: username
-              optional: true
-
             - name: KAFKA_SASL_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "tasktracker.fullname" . }}-kafka-user
                   key: password
-              optional: true
-
-            - name: KAFKA_TLS_ENABLE
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "tasktracker.fullname" . }}-kafka-tls
-                  key: ENABLE
-              optional: true
-
-            - name: KAFKA_TLS_INSECURE_SKIP_VERIFY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "tasktracker.fullname" . }}-kafka-tls
-                  key: INSECURE_SKIP_VERIFY
               optional: true
             {{- end }}
 
