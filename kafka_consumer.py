@@ -39,16 +39,22 @@ class KafkaConsumer:
             sasl_mechanism = os.getenv('KAFKA_SASL_MECHANISM', 'SCRAM-SHA-512')
             sasl_username = os.getenv('KAFKA_SASL_USERNAME', '')
             sasl_password = os.getenv('KAFKA_SASL_PASSWORD', '')
+            logger.info(f"SASL password length: {len(sasl_password)}")
 
             if tls_enable:
                 self.config['security.protocol'] = 'SASL_SSL'
             else:
                 self.config['security.protocol'] = 'SASL_PLAINTEXT'
 
-            self.config['sasl.mechanism'] = sasl_mechanism
-            self.config['sasl.username'] = sasl_username
-            self.config['sasl.password'] = sasl_password
-
+            # self.config['sasl.mechanisms'] = 'SCRAM-SHA-512'
+            # self.config['sasl.username'] = sasl_username
+            # self.config['sasl.password'] = sasl_password
+            self.config.update({
+                "security.protocol": "SASL_PLAINTEXT",
+                "sasl.mechanisms": "SCRAM-SHA-512",
+                "sasl.username": sasl_username,
+                "sasl.password": sasl_password,
+            })
             tls_insecure = os.getenv('KAFKA_TLS_INSECURE_SKIP_VERIFY', 'false').lower() == 'true'
             if tls_enable and tls_insecure:
                 self.config['enable.ssl.certificate.verification'] = False

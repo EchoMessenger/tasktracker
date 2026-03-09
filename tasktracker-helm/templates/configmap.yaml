@@ -12,7 +12,7 @@ data:
   KAFKA_GROUP_ID: {{ .Values.kafka.groupId | quote }}
   KAFKA_CLIENT_ID: {{ .Values.kafka.clientId | quote }}
 
-  DATABASE_HOST: {{ .Values.database.host | quote }}
+  DATABASE_HOST: {{ printf "%s-postgres" (include "tasktracker.fullname" .) | quote }}
   DATABASE_PORT: {{ .Values.database.port | quote }}
   DATABASE_NAME: {{ .Values.database.name | quote }}
   DATABASE_USERNAME: {{ .Values.database.username | quote }}

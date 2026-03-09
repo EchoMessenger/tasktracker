@@ -31,22 +31,21 @@ jobs:
         TESTING: "true"
       run: |
         pytest tests -v --cov=. --cov-report=xml
+  helm:
+    runs-on: ubuntu-latest
 
-#    - name: Check test coverage
-#      run: |
-#        python -c "
-#        import xml.etree.ElementTree as ET
-#        tree = ET.parse('coverage.xml')
-#        root = tree.getroot()
-#        coverage = float(root.attrib['line-rate']) * 100
-#        print(f'Coverage: {coverage:.2f}%')
-#        if coverage < 80:
-#            print('ERROR: Coverage is below 80%!')
-#            exit(1)
-#        "
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-#    - name: Upload coverage to Codecov
-#      uses: codecov/codecov-action@v3
-#      with:
-#        file: ./coverage.xml
-#        fail_ci_if_error: false
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Helm version
+        run: helm version
+
+      - name: Lint chart
+        run: helm lint tasktracker-helm
+
+      - name: Validate values with template
+        run: helm template test tasktracker-helm -f tasktracker-helm/values.yaml

@@ -10,7 +10,6 @@ service:
   type: ClusterIP
 
 database:
-  host: "tasktracker-tasktracker-postgres"
   port: 5432
   name: "tasktracker"
   username: "postgres"
