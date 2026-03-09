@@ -26,21 +26,26 @@ def get_db_session():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting Task Tracking Service")
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database tables created/verified")
-    global kafka_consumer
-    try:
-        kafka_consumer = KafkaConsumer(get_db_session)
-        kafka_consumer.start()
-        logger.info("Kafka consumer started successfully")
-    except Exception as e:
-        logger.error(f"Failed to start Kafka consumer: {e}")
-        logger.warning("Kafka synchronization will not work")
-        kafka_consumer = None
+    if not os.getenv("TESTING"):
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created/verified")
+
+        global kafka_consumer
+        try:
+            kafka_consumer = KafkaConsumer(get_db_session)
+            kafka_consumer.start()
+            logger.info("Kafka consumer started successfully")
+        except Exception as e:
+            logger.error(f"Failed to start Kafka consumer: {e}")
+            logger.warning("Kafka synchronization will not work")
+            kafka_consumer = None
+    else:
+        logger.info("Running in TEST mode — skipping DB init and Kafka")
 
     yield
+
     logger.info("Shutting down Task Tracking Service")
-    if kafka_consumer:
+    if not os.getenv("TESTING") and kafka_consumer:
         kafka_consumer.stop()
         logger.info("Kafka consumer stopped")
 
