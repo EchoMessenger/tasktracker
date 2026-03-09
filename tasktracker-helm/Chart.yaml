@@ -1,4 +1,4 @@
-apiVersion: v1
+apiVersion: v2
 name: tasktracker
 description: Task Tracking Service with FastAPI
 type: application
