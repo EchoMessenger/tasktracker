@@ -80,4 +80,4 @@ jobs:
           sudo mv pluto /usr/local/bin/pluto
       - name: Deprecated API check
         run: |
-          pluto detect -f rendered.yaml --target-versions "k8s=v$K8S_VERSION"
+          pluto detect rendered.yaml --target-versions "k8s=v$K8S_VERSION"
