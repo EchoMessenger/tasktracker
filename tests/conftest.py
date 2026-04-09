@@ -5,18 +5,23 @@ from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
-
+import uuid
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ["TESTING"] = "1"
 
 from main import app
 from database import get_db
+from sqlalchemy import event
 from crud import create_user
-from models.user import UserRole
+from models.user import UserRole, UserDB
 from schemas import UserCreate
 from api.endpoints.v2.tasks import get_current_user
 
+@event.listens_for(UserDB, "before_insert")
+def _autofill_keycloak_id(mapper, connection, target):
+    if not getattr(target, "keycloak_id", None):
+        target.keycloak_id = str(uuid.uuid4())
 
 @pytest.fixture(scope="session")
 def test_database_url():
@@ -79,7 +84,8 @@ def override_db(db_session):
 @pytest.fixture
 def sample_user_data():
     return {
+        "keycloak_id": str(uuid.uuid4()),
         "username": "testuser",
         "full_name": "Test User",
-        "role": "user"
+        "role": UserRole.USER,   # или "USER" — зависит от схемы
     }
