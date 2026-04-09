@@ -33,7 +33,8 @@ jobs:
         pytest tests -v --cov=. --cov-report=xml
   helm:
     runs-on: ubuntu-latest
-
+    env:
+      K8S_VERSION: "1.33.5"
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -49,3 +50,33 @@ jobs:
 
       - name: Validate values with template
         run: helm template test tasktracker-helm -f tasktracker-helm/values.yaml
+
+      - name: Render manifests (helm template)
+        run: |
+          helm template test tasktracker-helm \
+            -f tasktracker-helm/values.yaml \
+            --kube-version $K8S_VERSION \
+            --include-crds \
+            > rendered.yaml
+
+      - name: Install kubeconform
+        run: |
+          curl -L -o kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar -xzf kubeconform.tar.gz kubeconform
+          sudo mv kubeconform /usr/local/bin/kubeconform
+
+      - name: Offline manifest validation (OpenAPI)
+        run: |
+          kubeconform -strict -summary \
+            -kubernetes-version $K8S_VERSION \
+            rendered.yaml
+      - name: Install pluto
+        run: |
+          curl -L -o pluto.tar.gz \
+            https://github.com/FairwindsOps/pluto/releases/download/v5.20.3/pluto_5.20.3_linux_amd64.tar.gz
+          tar -xzf pluto.tar.gz pluto
+          sudo mv pluto /usr/local/bin/pluto
+      - name: Deprecated API check
+        run: |
+          pluto detect -f rendered.yaml --target-versions "k8s=v$K8S_VERSION"
