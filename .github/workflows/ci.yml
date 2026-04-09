@@ -81,3 +81,37 @@ jobs:
       - name: Deprecated API check
         run: |
           pluto detect rendered.yaml --target-versions "k8s=v$K8S_VERSION"
+
+      - name: Upload rendered manifests
+          uses: actions/upload-artifact@v4
+          with:
+            name: rendered-manifests
+            path: rendered.yaml
+  server_side_dry_run:
+    runs-on: ubuntu-latest
+    needs: helm
+    env:
+      K8S_VERSION: "1.33.5"
+    steps:
+      - name: Download rendered manifests
+        uses: actions/download-artifact@v4
+        with:
+          name: rendered-manifests
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.33.5"
+
+      - name: Install k3d
+        run: |
+          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+
+      - name: Create k3s cluster
+        run: |
+          k3d cluster create ci --image "rancher/k3s:v1.33.5-k3s1"
+          kubectl get nodes
+
+      - name: Server-side dry-run validation
+        run: |
+          kubectl apply --dry-run=server -f rendered.yaml
