@@ -56,17 +56,22 @@ spec:
                 secretKeyRef:
                   name: {{ include "tasktracker.fullname" . }}-database
                   key: password
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tasktracker.fullname" . }}-keycloak
+                  key: clientSecret
             {{- end }}
 
             # Kafka SASL configuration
-            {{- if .Values.openbao.enabled }}
-            - name: KAFKA_SASL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "tasktracker.fullname" . }}-kafka-user
-                  key: password
-              optional: true
-            {{- end }}
+#            {{- if .Values.openbao.enabled }}
+#            - name: KAFKA_SASL_PASSWORD
+#              valueFrom:
+#                secretKeyRef:
+#                  name: {{ include "tasktracker.fullname" . }}-kafka-user
+#                  key: password
+#              optional: true
+#            {{- end }}
 
           # Health checks
           livenessProbe:

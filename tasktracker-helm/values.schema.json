@@ -5,8 +5,7 @@
     "image",
     "replicaCount",
     "service",
-    "database",
-    "kafka"
+    "database"
   ],
   "properties": {
 
@@ -71,34 +70,6 @@
         "storage": {
           "type": "string",
           "pattern": "^[0-9]+Gi$"
-        }
-      }
-    },
-
-    "kafka": {
-      "type": "object",
-      "required": ["brokers", "topic", "groupId", "clientId"],
-      "properties": {
-        "brokers": { "type": "string" },
-        "topic": { "type": "string" },
-        "groupId": { "type": "string" },
-        "clientId": { "type": "string" },
-
-        "sasl": {
-          "type": "object",
-          "properties": {
-            "enabled": { "type": "boolean" },
-            "mechanism": { "type": "string" },
-            "username": { "type": "string" }
-          }
-        },
-
-        "tls": {
-          "type": "object",
-          "properties": {
-            "enabled": { "type": "boolean" },
-            "insecureSkipVerify": { "type": "boolean" }
-          }
         }
       }
     },

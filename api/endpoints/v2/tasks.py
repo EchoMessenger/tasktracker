@@ -12,13 +12,14 @@ from schemas.task import TaskResponse, TaskCreate, TaskUpdate, TaskStatusUpdate 
 from schemas.response import StandardResponse, PaginatedResponse
 import crud.task as task_crud
 import crud.user as user_crud
+from auth.dependencies import get_current_user
 
 router = APIRouter(prefix="/v2/tasks", tags=["tasks-v2"])
 
 
-def get_current_user():
-    """Заглушка - в реальном приложении здесь будет JWT токен"""
-    return 2
+# def get_current_user():
+#     """Заглушка - в реальном приложении здесь будет JWT токен"""
+#     return 2
 
 
 @router.post("/", response_model=StandardResponse, status_code=status.HTTP_201_CREATED)
