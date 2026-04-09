@@ -114,16 +114,16 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v4
 
-      - name: Install External Secrets Operator CRDs
+      - name: Install External Secrets Operator (wait for webhook)
         run: |
           helm repo add external-secrets https://charts.external-secrets.io
           helm repo update
+          
           helm upgrade --install external-secrets external-secrets/external-secrets \
             -n external-secrets --create-namespace \
-            --set installCRDs=true
-          
-          # Дождаться, что CRD зарегистрировалась в API-server
-          kubectl wait --for=condition=Established crd/externalsecrets.external-secrets.io --timeout=120s
+            --set installCRDs=true \
+            --wait --timeout 5m
+          kubectl -n external-secrets rollout status deploy/external-secrets-webhook --timeout=180s
 
       - name: Server-side dry-run validation
         run: |
