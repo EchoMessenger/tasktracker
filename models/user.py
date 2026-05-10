@@ -15,6 +15,7 @@ class UserDB(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True)
+    keycloak_id = Column(String(64), unique=True, nullable=False, index=True)
     username = Column(String(50), unique=True, nullable=False)
     full_name = Column(String(200))
     role = Column(Enum(UserRole), default=UserRole.USER, nullable=False)

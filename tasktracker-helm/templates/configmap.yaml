@@ -7,10 +7,10 @@ metadata:
 data:
   LOG_LEVEL: {{ .Values.log.level | quote }}
 
-  KAFKA_BROKERS: {{ .Values.kafka.brokers | quote }}
-  KAFKA_TOPIC: {{ .Values.kafka.topic | quote }}
-  KAFKA_GROUP_ID: {{ .Values.kafka.groupId | quote }}
-  KAFKA_CLIENT_ID: {{ .Values.kafka.clientId | quote }}
+#  KAFKA_BROKERS: {{ .Values.kafka.brokers | quote }}
+#  KAFKA_TOPIC: {{ .Values.kafka.topic | quote }}
+#  KAFKA_GROUP_ID: {{ .Values.kafka.groupId | quote }}
+#  KAFKA_CLIENT_ID: {{ .Values.kafka.clientId | quote }}
 
   DATABASE_HOST: {{ printf "%s-postgres" (include "tasktracker.fullname" .) | quote }}
   DATABASE_PORT: {{ .Values.database.port | quote }}
@@ -18,8 +18,11 @@ data:
   DATABASE_USERNAME: {{ .Values.database.username | quote }}
   DATABASE_SSLMODE: {{ .Values.database.sslmode | quote }}
 
-  KAFKA_SASL_ENABLE: {{ .Values.kafka.sasl.enabled | quote }}
-  KAFKA_SASL_MECHANISM: {{ .Values.kafka.sasl.mechanism | quote }}
-  KAFKA_SASL_USERNAME: {{ .Values.kafka.sasl.username | quote }}
-  KAFKA_TLS_ENABLE: {{ .Values.kafka.tls.enabled | quote }}
-  KAFKA_TLS_INSECURE_SKIP_VERIFY: {{ .Values.kafka.tls.insecureSkipVerify | quote }}
+#  KAFKA_SASL_ENABLE: {{ .Values.kafka.sasl.enabled | quote }}
+#  KAFKA_SASL_MECHANISM: {{ .Values.kafka.sasl.mechanism | quote }}
+#  KAFKA_SASL_USERNAME: {{ .Values.kafka.sasl.username | quote }}
+#  KAFKA_TLS_ENABLE: {{ .Values.kafka.tls.enabled | quote }}
+#  KAFKA_TLS_INSECURE_SKIP_VERIFY: {{ .Values.kafka.tls.insecureSkipVerify | quote }}
+
+  KEYCLOAK_CLIENT_ID: {{ .Values.keycloak.clientId | quote }}
+  KEYCLOAK_ISSUER_URI: {{ .Values.keycloak.issuerUri | quote }}
