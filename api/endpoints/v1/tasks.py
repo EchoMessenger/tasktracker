@@ -8,13 +8,9 @@ from schemas.task import TaskResponse, TaskCreate, TaskUpdate, TaskStatusUpdate 
 from schemas.response import StandardResponse, PaginatedResponse
 import crud.task as task_crud
 import crud.user as user_crud
+from auth.dependencies import get_current_user
 
 router = APIRouter(prefix="/v1/tasks", tags=["tasks-v1"])
-
-
-def get_current_user():
-    """Заглушка - в реальном приложении здесь будет JWT токен"""
-    return 2
 
 
 @router.post("/", response_model=StandardResponse, status_code=status.HTTP_201_CREATED)
@@ -23,22 +19,17 @@ def create_task(
         db: Session = Depends(get_db)
 ):
     """Создать новую задачу"""
-    # Проверяем существование пользователя-создателя
     creator = user_crud.get_user(db, task.creator_id)
     if not creator:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Creator user with id {task.creator_id} not found"
         )
-
-    # ПРОВЕРЯЕМ ПРАВА НА СОЗДАНИЕ ЗАДАЧ
     if not creator.can_create_task():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"User with role '{creator.role.value}' cannot create tasks"
         )
-
-    # Проверяем существование назначенных пользователей
     if task.assigned_user_ids:
         for user_id in task.assigned_user_ids:
             if not user_crud.get_user(db, user_id):
@@ -73,8 +64,6 @@ def read_tasks(
         search=search
     )
     total = task_crud.get_tasks_count(db, user_id=user_id, status=status, search=search)
-
-    # Преобразуем задачи в словари
     tasks_dict = [task_crud.task_to_dict(task) for task in tasks]
 
     return PaginatedResponse(
@@ -107,24 +96,6 @@ def read_task(task_id: int, db: Session = Depends(get_db)):
         data=task_dict
     )
 
-
-# @router.put("/{task_id}", response_model=StandardResponse)
-# def update_task(
-#         task_id: int,
-#         task: TaskUpdate,
-#         db: Session = Depends(get_db),
-#         current_user_id: int = Depends(get_current_user)
-# ):
-#     db_task = task_crud.update_task(db, task_id=task_id, task_update=task, current_user_id=current_user_id)
-#     if db_task is None:
-#         raise HTTPException(
-#             status_code=status.HTTP_404_NOT_FOUND,
-#             detail="Task not found"
-#         )
-#     return StandardResponse(
-#         message="Task updated successfully",
-#         data=db_task
-#     )
 @router.put("/{task_id}", response_model=StandardResponse)
 def update_task(
         task_id: int,

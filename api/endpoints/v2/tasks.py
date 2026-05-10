@@ -21,7 +21,6 @@ def create_task(
         db: Session = Depends(get_db)
 ):
     """Создать новую задачу"""
-    # Проверяем существование пользователя-создателя
     creator = user_crud.get_user(db, task.creator_id)
     if not creator:
         raise HTTPException(
@@ -33,8 +32,6 @@ def create_task(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"User with role '{creator.role.value}' cannot create tasks"
         )
-
-    # Проверяем существование назначенных пользователей
     if task.assigned_user_ids:
         for user_id in task.assigned_user_ids:
             if not user_crud.get_user(db, user_id):
