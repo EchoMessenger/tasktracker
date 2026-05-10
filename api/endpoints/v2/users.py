@@ -30,7 +30,7 @@ def read_users(
     )
 
 
-@router.get("/{user_id}", response_model=StandardResponse)
+@router.get("/{user_id}", response_model=StandardResponse[User])
 def read_user(user_id: int, db: Session = Depends(get_db)):
     """Получить пользователя по ID"""
     db_user = crud.get_user(db, user_id=user_id)
@@ -41,23 +41,23 @@ def read_user(user_id: int, db: Session = Depends(get_db)):
         )
     return StandardResponse(
         message="User retrieved successfully",
-        data=db_user
+        data= db_user
     )
 
-@router.post("/authenticate", response_model=StandardResponse)
-def authenticate_user(
-        username: str = Query(..., description="Username"),
-        password: str = Query(..., description="Password"),
-        db: Session = Depends(get_db)
-):
-    """Аутентификация пользователя по username"""
-    user = crud.authenticate_user(db, username=username, password=password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials"
-        )
-    return StandardResponse(
-        message="Authentication successful",
-        data=user
-    )
+# @router.post("/authenticate", response_model=StandardResponse)
+# def authenticate_user(
+#         username: str = Query(..., description="Username"),
+#         password: str = Query(..., description="Password"),
+#         db: Session = Depends(get_db)
+# ):
+#     """Аутентификация пользователя по username"""
+#     user = crud.authenticate_user(db, username=username, password=password)
+#     if not user:
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED,
+#             detail="Invalid credentials"
+#         )
+#     return StandardResponse(
+#         message="Authentication successful",
+#         data=user
+#     )

@@ -4,11 +4,12 @@ from datetime import datetime
 
 T = TypeVar('T')
 
-class StandardResponse(BaseModel):
+class StandardResponse(BaseModel, Generic[T]):
     """Стандартный ответ для успешных операций"""
     success: bool = True
     message: str
-    data: Optional[Any] = None
+    # data: Optional[Any] = None
+    data: Optional[T] = None
     timestamp: datetime = Field(default_factory=datetime.now)
 
     class Config:
