@@ -246,23 +246,6 @@ def update_task_status_with_cascade(
 
     return updated_task
 
-# def delete_task(db: Session, task_id: int) -> bool:
-#     """Удалить задачу"""
-#     db_task = get_task(db, task_id)
-#     if not db_task:
-#         return False
-#     db.query(TaskAssignmentDB).filter(TaskAssignmentDB.task_id == task_id).delete()
-#     db.query(TaskHierarchyDB).filter(
-#         or_(
-#             TaskHierarchyDB.parent_id == task_id,
-#             TaskHierarchyDB.child_id == task_id
-#         )
-#     ).delete()
-#
-#     db.delete(db_task)
-#     db.commit()
-#     return True
-
 
 def delete_task(db: Session, task_id: int) -> bool:
     """Удалить задачу"""

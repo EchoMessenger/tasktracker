@@ -29,11 +29,6 @@ class KeycloakConfig:
 
     @property
     def server_url(self) -> str:
-        """
-        Например:
-        issuer_uri=https://auth.echo-messenger.ru/realms/echo
-        server_url=https://auth.echo-messenger.ru
-        """
         marker = "/realms/"
         if marker in self.issuer_uri:
             return self.issuer_uri.split(marker)[0]

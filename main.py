@@ -6,7 +6,6 @@ import json
 import os
 import logging
 from contextlib import asynccontextmanager
-from kafka_consumer import KafkaConsumer
 from config.keycloak import KeycloakConfig
 from services.keycloak_admin import KeycloakAdminClient
 from services.user_sync import UserSyncService
@@ -57,32 +56,6 @@ def sync_users_on_startup():
     finally:
         db.close()
 
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     logger.info("Starting Task Tracking Service")
-#     if not os.getenv("TESTING"):
-#         Base.metadata.create_all(bind=engine)
-#         logger.info("Database tables created/verified")
-#
-#         global kafka_consumer
-#         try:
-#             kafka_consumer = KafkaConsumer(get_db_session)
-#             kafka_consumer.start()
-#             logger.info("Kafka consumer started successfully")
-#         except Exception as e:
-#             logger.error(f"Failed to start Kafka consumer: {e}")
-#             logger.warning("Kafka synchronization will not work")
-#             kafka_consumer = None
-#     else:
-#         logger.info("Running in TEST mode — skipping DB init and Kafka")
-#
-#     yield
-#
-#     logger.info("Shutting down Task Tracking Service")
-#     if not os.getenv("TESTING") and kafka_consumer:
-#         kafka_consumer.stop()
-#         logger.info("Kafka consumer stopped")
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting Task Tracking Service")
@@ -130,18 +103,4 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "healthy", "user_sync": "active", "auth": "active"}
-
-
-# @app.get("/kafka/info")
-# def kafka_info():
-#     """Информация о Kafka подключении"""
-#     if not kafka_consumer:
-#         return {"status": "not_initialized"}
-#
-#     return {
-#         "status": "running" if kafka_consumer.running else "stopped",
-#         "topic": kafka_consumer.topic,
-#         "group_id": kafka_consumer.config.get('group.id'),
-#         "bootstrap_servers": kafka_consumer.config.get('bootstrap.servers')
-#     }
 #Запуск через консоль: uvicorn main:app --reload

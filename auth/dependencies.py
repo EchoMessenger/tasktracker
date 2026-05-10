@@ -11,10 +11,8 @@ from services.keycloak_admin import KeycloakAdminClient
 
 logger = logging.getLogger(__name__)
 
-# Security scheme
 security = HTTPBearer()
 
-# Глобальные объекты — инициализируются при старте
 _keycloak_config: KeycloakConfig | None = None
 _jwt_validator: JWTValidator | None = None
 
@@ -45,8 +43,6 @@ async def get_current_user(
     """
     validator = get_jwt_validator()
     token = credentials.credentials
-
-    # Валидация токена
     payload = validator.validate_token(token)
     user_info = validator.extract_user_info(payload)
 
@@ -56,12 +52,9 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token missing 'sub' claim",
         )
-
-    # Ищем пользователя по keycloak_id
     user = db.query(UserDB).filter(UserDB.keycloak_id == keycloak_id).first()
 
     if not user:
-        # Just-in-time provisioning — создаём пользователя из токена
         logger.info(f"JIT provisioning user: {user_info.get('username')} ({keycloak_id})")
         role = KeycloakAdminClient.map_keycloak_role(user_info.get("roles", []))
 

@@ -19,8 +19,6 @@ def startup_sync() -> None:
     Блокирует запуск, пока все пользователи не синхронизированы.
     """
     config = KeycloakConfig.from_env()
-
-    # Инициализируем аутентификацию (загружаем JWKS)
     logger.info("Initializing auth module...")
     for attempt in range(1, MAX_RETRIES + 1):
         try:
@@ -36,8 +34,6 @@ def startup_sync() -> None:
                     f"Cannot initialize auth after {MAX_RETRIES} attempts"
                 ) from e
             time.sleep(RETRY_DELAY_SECONDS)
-
-    # Синхронизируем пользователей
     logger.info("Starting user synchronization from Keycloak...")
     keycloak_client = KeycloakAdminClient(config)
     sync_service = UserSyncService(keycloak_client)
