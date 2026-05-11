@@ -155,10 +155,11 @@ def create_task(db: Session, task: TaskCreate) -> TaskDB:
     db.refresh(db_task)
     if task.assigned_user_ids:
         assign_users_to_task(db, db_task.id, task.assigned_user_ids)
-    created_task = get_task(db, db_task.id)
-    if created_task:
-        return task_to_dict(created_task)
-    return None
+    # created_task = get_task(db, db_task.id)
+    # if created_task:
+    #     return task_to_dict(created_task)
+    # return None
+    return db_task
 
 
 def update_task(db: Session, task_id: int, task_update: TaskUpdate, current_user_id: int) -> Optional[dict]:
