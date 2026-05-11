@@ -10,7 +10,7 @@ from schemas.task import TaskResponse, TaskCreate, TaskUpdate, TaskStatusUpdate 
 from schemas.response import StandardResponse, PaginatedResponse
 import crud.task as task_crud
 import crud.user as user_crud
-from auth.dependencies import get_current_user
+from auth.dependencies import get_current_user, get_current_user_id
 
 router = APIRouter(prefix="/v2/tasks", tags=["tasks-v2"])
 
@@ -209,7 +209,7 @@ def update_task(
         task_id: int,
         task: TaskUpdate,
         db: Session = Depends(get_db),
-        current_user_id: int = Depends(get_current_user)
+        current_user_id: int = Depends(get_current_user_id)
 ):
     """Обновить задачу"""
     db_task = task_crud.update_task(db, task_id=task_id, task_update=task, current_user_id=current_user_id)
@@ -232,7 +232,7 @@ def update_task_status(
         task_id: int,
         status_update: TaskStatusUpdate,
         db: Session = Depends(get_db),
-        current_user_id: int = Depends(get_current_user)
+        current_user_id: int = Depends(get_current_user_id)
 ):
     """Обновить статус задачи с автоматическим обновлением родительской задачи"""
     db_task = task_crud.update_task_status(
@@ -278,7 +278,7 @@ def update_task_status(
 def delete_task(
         task_id: int,
         db: Session = Depends(get_db),
-        current_user_id: int = Depends(get_current_user)
+        current_user_id: int = Depends(get_current_user_id)
 ):
     """Удалить задачу"""
     db_task = task_crud.get_task(db, task_id)
@@ -384,7 +384,7 @@ def create_task_hierarchy(
         parent_id: int,
         child_id: int,
         db: Session = Depends(get_db),
-        current_user_id: int = Depends(get_current_user)
+        current_user_id: int = Depends(get_current_user_id)
 ):
     """Создать связь родитель-потомок между задачами"""
     # Проверяем существование обеих задач
