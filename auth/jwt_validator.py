@@ -84,7 +84,7 @@ class JWTValidator:
                 # audience=self.config.client_id,
                 options={
                     "verify_signature": True,
-                    "verify_aud": False,  # можно временно отключить, если BFF шлёт токены не для auth
+                    "verify_aud": False,
                     "verify_iss": True,
                     "verify_exp": True,
                 },
@@ -106,3 +106,17 @@ class JWTValidator:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=f"Invalid token: {e}",
             )
+
+    def extract_user_info(self, payload: dict) -> dict:
+        """
+        Извлечь нужную информацию о пользователе из JWT payload.
+        """
+        roles = payload.get("realm_access", {}).get("roles", [])
+
+        return {
+            "keycloak_id": payload.get("sub"),
+            "username": payload.get("preferred_username"),
+            "full_name": payload.get("name"),
+            "email": payload.get("email"),
+            "roles": roles,
+        }
