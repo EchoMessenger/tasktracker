@@ -365,3 +365,13 @@ def get_task_hierarchy(db: Session, task_id: int) -> dict:
         'parents': parents,
         'children': children
     }
+def get_assigned_users(db: Session, task_id: int) -> List[UserDB]:
+    """Получить список пользователей, назначенных на задачу"""
+    task = db.query(TaskDB).options(
+        joinedload(TaskDB.assignments).joinedload(TaskAssignmentDB.user)
+    ).filter(TaskDB.id == task_id).first()
+
+    if not task:
+        return []
+
+    return [assignment.user for assignment in task.assignments if assignment.user]
