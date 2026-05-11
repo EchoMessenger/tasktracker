@@ -117,9 +117,9 @@ class KeycloakAdminClient:
 
     @staticmethod
     def map_keycloak_role(keycloak_roles: list[str]) -> UserRole:
-        if "admin" in keycloak_roles:
+        if "task-tracker_admin" in keycloak_roles:
             return UserRole.ADMIN
-        if "manager" in keycloak_roles:
+        if "task-tracker_manager" in keycloak_roles:
             return UserRole.MANAGER
         return UserRole.USER
 
