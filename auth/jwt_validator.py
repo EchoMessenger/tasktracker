@@ -81,7 +81,7 @@ class JWTValidator:
                 signing_key,
                 algorithms=["RS256", "RS384", "RS512", "PS256", "PS384", "PS512"],
                 issuer=self._issuer,
-                audience=self.config.client_id,
+                # audience=self.config.client_id,
                 options={
                     "verify_signature": True,
                     "verify_aud": False,  # можно временно отключить, если BFF шлёт токены не для auth
