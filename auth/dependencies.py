@@ -42,6 +42,9 @@ async def get_current_user(
     Если пользователя нет в БД — создаёт автоматически (just-in-time provisioning).
     """
     validator = get_jwt_validator()
+    logger.info(f"AUTH HEADER RAW: {credentials}")
+    logger.info(f"TOKEN START: {credentials.credentials[:40]}")
+    logger.info(f"TOKEN LENGTH: {len(credentials.credentials)}")
     token = credentials.credentials
     payload = validator.validate_token(token)
     user_info = validator.extract_user_info(payload)
