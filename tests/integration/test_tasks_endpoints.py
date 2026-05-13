@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from datetime import datetime
 
+from auth.dependencies import get_current_user_id
 from main import app
 from models.user import UserRole
 from models.task import TaskDB, TaskStatus, TaskAssignmentDB
@@ -162,8 +163,6 @@ def test_delete_task_success(client, db_session: Session, sample_user):
     db_session.add(task)
     db_session.commit()
     db_session.refresh(task)
-
-    # Сохраняем ID до удаления
     task_id = task.id
 
     response = client.delete(f"/v2/tasks/{task_id}")
@@ -173,10 +172,210 @@ def test_delete_task_success(client, db_session: Session, sample_user):
     data = response.json()
     assert data["message"] == "Task deleted successfully"
 
-    # Проверяем, что задача удалена
     response_check = client.get(f"/v2/tasks/{task_id}")
     assert response_check.status_code == 404
 
+def test_create_task_forbidden(client, db_session):
+    user = crud_create_user(db_session, UserCreate(
+        username="no_create_user",
+        full_name="No Create",
+        role=UserRole.USER
+    ))
+
+    user.can_create_task = lambda: False
+
+    response = client.post("/v2/tasks/", json={
+        "title": "Forbidden Task",
+        "description": "x",
+        "creator_id": user.id,
+        "assigned_user_ids": []
+    })
+
+    assert response.status_code == 403
+
+def test_create_subtask_parent_not_found(client, sample_user):
+    response = client.post(
+        "/v2/tasks/99999/subtasks",
+        json={
+            "title": "Child",
+            "description": "c",
+            "creator_id": sample_user.id,
+            "assigned_user_ids": []
+        }
+    )
+
+    assert response.status_code == 404
+
+def test_create_hierarchy_cycle(client, db_session, sample_user):
+    t1 = crud_create_task(db_session, TaskCreate(
+        title="T1", description="x",
+        creator_id=sample_user.id,
+        assigned_user_ids=[]
+    ))
+    t2 = crud_create_task(db_session, TaskCreate(
+        title="T2", description="x",
+        creator_id=sample_user.id,
+        assigned_user_ids=[]
+    ))
+
+    client.post(f"/v2/tasks/hierarchy/{t1.id}/{t2.id}")
+    response = client.post(f"/v2/tasks/hierarchy/{t2.id}/{t1.id}")
+
+    assert response.status_code == 400
+
+def test_delete_task_forbidden(client, db_session):
+    creator = crud_create_user(db_session, UserCreate(
+        username="creator_x",
+        full_name="Creator X",
+        role=UserRole.USER
+    ))
+
+    other = crud_create_user(db_session, UserCreate(
+        username="other_x",
+        full_name="Other X",
+        role=UserRole.USER
+    ))
+
+    task = crud_create_task(db_session, TaskCreate(
+        title="Task",
+        description="x",
+        creator_id=creator.id,
+        assigned_user_ids=[]
+    ))
+
+    app.dependency_overrides[get_current_user_id] = lambda: other.id
+
+    response = client.delete(f"/v2/tasks/{task.id}")
+
+    assert response.status_code == 403
+
+def test_assign_user_not_found(client, db_session, sample_user):
+    task = crud_create_task(db_session, TaskCreate(
+        title="Assign Test",
+        description="x",
+        creator_id=sample_user.id,
+        assigned_user_ids=[]
+    ))
+
+    response = client.post(
+        f"/v2/tasks/{task.id}/assign",
+        json=[99999]
+    )
+
+    assert response.status_code == 404
+
+def test_update_task_status_cascade_to_parent(client, db_session: Session, sample_user):
+    from crud.task import create_task_hierarchy
+    from schemas.task import TaskCreate
+
+    parent = crud_create_task(db_session, TaskCreate(
+        title="Parent Task",
+        description="Parent",
+        creator_id=sample_user.id,
+        assigned_user_ids=[]
+    ))
+
+    child1 = crud_create_task(db_session, TaskCreate(
+        title="Child 1",
+        description="Child",
+        creator_id=sample_user.id,
+        assigned_user_ids=[]
+    ))
+
+    child2 = crud_create_task(db_session, TaskCreate(
+        title="Child 2",
+        description="Child",
+        creator_id=sample_user.id,
+        assigned_user_ids=[]
+    ))
+
+    create_task_hierarchy(db_session, parent.id, child1.id)
+    create_task_hierarchy(db_session, parent.id, child2.id)
+
+    response1 = client.patch(
+        f"/v2/tasks/{child1.id}/status",
+        json={"status": "completed"}
+    )
+    assert response1.status_code == 200
+
+    parent_after_first = get_task(db_session, parent.id)
+    assert parent_after_first.status == TaskStatus.OPEN
+
+    response2 = client.patch(
+        f"/v2/tasks/{child2.id}/status",
+        json={"status": "completed"}
+    )
+    assert response2.status_code == 200
+
+    parent_after_second = get_task(db_session, parent.id)
+    assert parent_after_second.status == TaskStatus.COMPLETED
+
+def test_update_status_completed_without_parent(client, db_session, sample_user):
+    task = crud_create_task(db_session, TaskCreate(
+        title="Single Task",
+        description="No parent",
+        creator_id=sample_user.id,
+        assigned_user_ids=[]
+    ))
+
+    response = client.patch(
+        f"/v2/tasks/{task.id}/status",
+        json={"status": "completed"}
+    )
+
+    assert response.status_code == 200
+
+def test_create_subtask_inherits_parent_assignments(client, db_session: Session, sample_user):
+    from crud.task import get_task
+    from models.task import TaskAssignmentDB, TaskHierarchyDB
+    from schemas.task import TaskCreate
+    from schemas.user import UserCreate
+
+    user2 = crud_create_user(db_session, UserCreate(
+        username="parent_assignee",
+        full_name="Parent Assignee",
+        role=UserRole.USER
+    ))
+
+    parent = crud_create_task(db_session, TaskCreate(
+        title="Parent Task",
+        description="Parent",
+        creator_id=sample_user.id,
+        assigned_user_ids=[sample_user.id, user2.id]
+    ))
+
+    response = client.post(
+        f"/v2/tasks/{parent.id}/subtasks",
+        json={
+            "title": "Subtask",
+            "description": "Child",
+            "creator_id": sample_user.id,
+            "assigned_user_ids": []
+        }
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["message"] == "Subtask created successfully"
+
+    subtask_id = data["data"]["id"]
+
+    assignments = db_session.query(TaskAssignmentDB).filter(
+        TaskAssignmentDB.task_id == subtask_id
+    ).all()
+
+    assigned_user_ids = sorted([a.user_id for a in assignments])
+    assert assigned_user_ids == sorted([sample_user.id, user2.id])
+
+    hierarchy = db_session.query(TaskHierarchyDB).filter(
+        TaskHierarchyDB.child_id == subtask_id
+    ).first()
+
+    assert hierarchy is not None
+    assert hierarchy.parent_id == parent.id
+
+    db_subtask = get_task(db_session, subtask_id)
+    assert db_subtask is not None
 
 def test_assign_users_to_task_success(client, db_session: Session, sample_user):
     """Успешное назначение пользователей на задачу"""
