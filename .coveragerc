@@ -1,0 +1,28 @@
+[coverage:run]
+omit =
+    main.py
+    auth/*
+    database.py
+    drop_tables.py
+    kafka_consumer.py
+    */__init__.py
+    tests/*
+    api\endpoints\v1\*
+    config/*
+    services/*
+    generate_openapi.py
+
+
+[coverage:report]
+omit =
+    main.py
+    auth/*
+    database.py
+    drop_tables.py
+    kafka_consumer.py
+    */__init__.py
+    tests/*
+    api\endpoints\v1\*
+    config/*
+    services/*
+    generate_openapi.py
