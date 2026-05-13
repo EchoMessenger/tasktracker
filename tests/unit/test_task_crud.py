@@ -2,6 +2,8 @@ import pytest
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
+from models.task import TaskStatus
+
 
 class TestSimpleTaskCRUD:
     """Простые тесты для модуля задач"""
@@ -872,15 +874,11 @@ class TestTaskFunctions:
 
         # Проверяем результат
         assert result is not None
-        assert result["title"] == "New Task"
-        assert result["description"] == "New task description"
-        assert result["status"] == "open"
-        assert result["creator_id"] == creator.id
-        assert result["due_date"].date() == due_date.date()
-        assert result["creator"] is not None
-        assert result["creator"]["username"] == "task_creator_user"
-        assert result["assigned_users"] == []
-        assert result["assigned_user_ids"] == []
+        assert result.title == "New Task"
+        assert result.description == "New task description"
+        assert result.status == TaskStatus.OPEN
+        assert result.creator_id == creator.id
+        assert result.due_date.date() == due_date.date()
 
     def test_create_task_with_assigned_users(self, db_session: Session):
         """Тест создания задачи с назначенными пользователями"""
@@ -919,21 +917,19 @@ class TestTaskFunctions:
 
         result = create_task(db_session, task_data)
 
-        # Проверяем результат
         assert result is not None
-        assert result["title"] == "Task With Assignees"
-        assert len(result["assigned_users"]) == 2
-        assert result["assigned_user_ids"] == [assignee1.id, assignee2.id]
-
-        # Проверяем что пользователи правильно назначены
-        assigned_usernames = [user["username"] for user in result["assigned_users"]]
+        assert result.title == "Task With Assignees"
+        assert result.status == TaskStatus.OPEN
+        db_task = get_task(db_session, result.id)
+        assert db_task is not None
+        assigned_users = [assignment.user for assignment in db_task.assignments]
+        assert len(assigned_users) == 2
+        assigned_usernames = [user.username for user in assigned_users]
         assert "assignee_for_task1" in assigned_usernames
         assert "assignee_for_task2" in assigned_usernames
-
-        # Проверяем роли назначенных пользователей
-        for user in result["assigned_users"]:
-            if user["username"] == "assignee_for_task2":
-                assert user["role"] == "manager"
+        for user in assigned_users:
+            if user.username == "assignee_for_task2":
+                assert user.role == UserRole.MANAGER
 
     def test_create_task_without_description(self, db_session: Session):
         """Тест создания задачи без описания"""
@@ -960,27 +956,25 @@ class TestTaskFunctions:
         result = create_task(db_session, task_data)
 
         assert result is not None
-        assert result["title"] == "Task Without Description"
-        assert result["description"] is None
-        assert result["status"] == "open"
+        assert result.title == "Task Without Description"
+        assert result.description is None
+        assert result.status == TaskStatus.OPEN
 
     def test_update_task_function_basic(self, db_session: Session):
-        """Тест базового обновления задачи"""
-        from crud.task import create_task, update_task, get_task
+        from crud.task import create_task, update_task
         from crud.user import create_user
         from schemas.task import TaskCreate, TaskUpdate
         from schemas.user import UserCreate
         from models.user import UserRole
+        from models.task import TaskStatus
         import datetime
 
-        # Создаем пользователя
         creator = create_user(db_session, UserCreate(
             username="update_creator",
             full_name="Update Creator",
             role=UserRole.USER
         ))
 
-        # Создаем задачу
         original_due_date = datetime.datetime.utcnow() + datetime.timedelta(days=3)
         task_data = TaskCreate(
             title="Original Title",
@@ -991,9 +985,9 @@ class TestTaskFunctions:
         )
 
         created_task = create_task(db_session, task_data)
-        task_id = created_task["id"]
+        task_id = created_task.id
+        old_updated_at = created_task.updated_at
 
-        # Обновляем задачу
         new_due_date = datetime.datetime.utcnow() + datetime.timedelta(days=10)
         update_data = TaskUpdate(
             title="Updated Title",
@@ -1004,7 +998,6 @@ class TestTaskFunctions:
 
         updated_task = update_task(db_session, task_id, update_data, creator.id)
 
-        # Проверяем обновления
         assert updated_task is not None
         assert updated_task["id"] == task_id
         assert updated_task["title"] == "Updated Title"
@@ -1012,17 +1005,15 @@ class TestTaskFunctions:
         assert updated_task["status"] == "in_progress"
         assert updated_task["due_date"].date() == new_due_date.date()
         assert updated_task["creator_id"] == creator.id
-
-        # Проверяем что дата обновления изменилась
-        assert updated_task["updated_at"] != created_task["updated_at"]
+        assert updated_task["updated_at"] != old_updated_at
 
     def test_update_task_partial_update(self, db_session: Session):
-        """Тест частичного обновления задачи"""
         from crud.task import create_task, update_task
         from crud.user import create_user
         from schemas.task import TaskCreate, TaskUpdate
         from schemas.user import UserCreate
         from models.user import UserRole
+        from models.task import TaskStatus
 
         creator = create_user(db_session, UserCreate(
             username="partial_update_creator",
@@ -1030,7 +1021,6 @@ class TestTaskFunctions:
             role=UserRole.USER
         ))
 
-        # Создаем задачу
         task_data = TaskCreate(
             title="Original Task",
             description="Original Description",
@@ -1039,34 +1029,30 @@ class TestTaskFunctions:
         )
 
         created_task = create_task(db_session, task_data)
-        task_id = created_task["id"]
+        task_id = created_task.id
 
-        # Обновляем только заголовок
         update_data = TaskUpdate(title="New Title Only")
         updated_task = update_task(db_session, task_id, update_data, creator.id)
 
         assert updated_task is not None
         assert updated_task["title"] == "New Title Only"
-        assert updated_task["description"] == "Original Description"  # Не изменилось
-        assert updated_task["status"] == "open"  # Не изменилось
+        assert updated_task["description"] == "Original Description"
+        assert updated_task["status"] == "open"
 
-        # Обновляем только статус
         update_data = TaskUpdate(status="completed")
         updated_task = update_task(db_session, task_id, update_data, creator.id)
 
         assert updated_task is not None
-        assert updated_task["title"] == "New Title Only"  # Не изменилось
+        assert updated_task["title"] == "New Title Only"
         assert updated_task["status"] == "completed"
 
     def test_update_task_with_assigned_users(self, db_session: Session):
-        """Тест обновления задачи с назначением пользователей"""
-        from crud.task import create_task, update_task
+        from crud.task import create_task, update_task, get_task
         from crud.user import create_user
         from schemas.task import TaskCreate, TaskUpdate
         from schemas.user import UserCreate
         from models.user import UserRole
 
-        # Создаем пользователей
         creator = create_user(db_session, UserCreate(
             username="assign_update_creator",
             full_name="Assign Update Creator",
@@ -1085,7 +1071,6 @@ class TestTaskFunctions:
             role=UserRole.USER
         ))
 
-        # Создаем задачу с одним назначенным пользователем
         task_data = TaskCreate(
             title="Task to Update Assignments",
             description="Task description",
@@ -1094,18 +1079,18 @@ class TestTaskFunctions:
         )
 
         created_task = create_task(db_session, task_data)
-        task_id = created_task["id"]
+        task_id = created_task.id
 
-        # Проверяем исходные назначения
-        assert created_task["assigned_user_ids"] == [assignee1.id]
+        db_created = get_task(db_session, task_id)
+        assert [assignment.user_id for assignment in db_created.assignments] == [assignee1.id]
 
-        # Обновляем назначения
         update_data = TaskUpdate(assigned_user_ids=[assignee2.id])
         updated_task = update_task(db_session, task_id, update_data, creator.id)
 
-        # Проверяем что назначения обновились
         assert updated_task is not None
-        assert updated_task["assigned_user_ids"] == [assignee2.id]
+
+        db_updated = get_task(db_session, task_id)
+        assert [assignment.user_id for assignment in db_updated.assignments] == [assignee2.id]
 
     def test_update_task_permissions_creator(self, db_session: Session):
         """Тест прав доступа для обновления задачи (создатель)"""
@@ -1138,7 +1123,7 @@ class TestTaskFunctions:
         )
 
         created_task = create_task(db_session, task_data)
-        task_id = created_task["id"]
+        task_id = created_task.id
 
         # Создатель может обновлять задачу
         update_data = TaskUpdate(title="Updated by Creator")
@@ -1180,7 +1165,7 @@ class TestTaskFunctions:
         )
 
         created_task = create_task(db_session, task_data)
-        task_id = created_task["id"]
+        task_id = created_task.id
 
         # Администратор может обновлять задачу
         update_data = TaskUpdate(title="Updated by Admin")
@@ -1218,7 +1203,7 @@ class TestTaskFunctions:
         )
 
         created_task = create_task(db_session, task_data)
-        task_id = created_task["id"]
+        task_id = created_task.id
 
         # Менеджер может обновлять задачу
         update_data = TaskUpdate(title="Updated by Manager")
@@ -1269,7 +1254,7 @@ class TestTaskFunctions:
         )
 
         created_task = create_task(db_session, task_data)
-        task_id = created_task["id"]
+        task_id = created_task.id
 
         # Создатель может обновить статус
         updated_task = update_task_status(db_session, task_id, TaskStatus.IN_PROGRESS, creator.id)
@@ -1312,7 +1297,7 @@ class TestTaskFunctions:
         )
 
         created_task = create_task(db_session, task_data)
-        task_id = created_task["id"]
+        task_id = created_task.id
 
         # Назначенный пользователь может обновить статус
         updated_task = update_task_status(db_session, task_id, TaskStatus.REVIEW, assignee.id)
@@ -1356,7 +1341,7 @@ class TestTaskFunctions:
         )
 
         created_task = create_task(db_session, task_data)
-        task_id = created_task["id"]
+        task_id = created_task.id
 
         # Создатель может обновить статус
         result = update_task_status(db_session, task_id, TaskStatus.IN_PROGRESS, creator.id)
@@ -1416,7 +1401,7 @@ class TestTaskFunctions:
         )
 
         created_task = create_task(db_session, task_data)
-        task_id = created_task["id"]
+        task_id = created_task.id
 
         # Проверяем что задача существует
         assert get_task(db_session, task_id) is not None
@@ -1458,7 +1443,7 @@ class TestTaskFunctions:
         )
 
         created_task = create_task(db_session, task_data)
-        task_id = created_task["id"]
+        task_id = created_task.id
 
         # Проверяем что задача существует
         assert get_task(db_session, task_id) is not None
@@ -1478,21 +1463,19 @@ class TestTaskFunctions:
         assert len(assignments) == 0
 
     def test_delete_task_with_hierarchy(self, db_session: Session):
-        """Тест удаления задачи с иерархическими связями"""
         from crud.task import create_task, delete_task, get_task, create_task_hierarchy
         from crud.user import create_user
         from schemas.task import TaskCreate
         from schemas.user import UserCreate
         from models.user import UserRole
         from models.task import TaskDB, TaskHierarchyDB
-        # Создаем пользователя
+
         creator = create_user(db_session, UserCreate(
             username="hierarchy_delete_creator",
             full_name="Hierarchy Delete Creator",
             role=UserRole.USER
         ))
 
-        # Создаем две задачи
         task1_data = TaskCreate(
             title="Parent Task to Delete",
             description="Parent",
@@ -1510,35 +1493,28 @@ class TestTaskFunctions:
         task1 = create_task(db_session, task1_data)
         task2 = create_task(db_session, task2_data)
 
-        # Создаем иерархическую связь
-        hierarchy_result = create_task_hierarchy(db_session, task1["id"], task2["id"])
+        parent_id = task1.id
+        child_id = task2.id
+
+        hierarchy_result = create_task_hierarchy(db_session, parent_id, child_id)
         assert hierarchy_result is not None
 
-        # Проверяем что иерархия создана
-        from models.task import TaskHierarchyDB
         hierarchies = db_session.query(TaskHierarchyDB).filter(
-            TaskHierarchyDB.parent_id == task1["id"]
+            TaskHierarchyDB.parent_id == parent_id
         ).all()
         assert len(hierarchies) == 1
 
-        # Удаляем родительскую задачу (используем простой запрос для проверки)
-        db_task = db_session.query(TaskDB).filter(TaskDB.id == task1["id"]).first()
-        assert db_task is not None
-
-        result = delete_task(db_session, task1["id"])
+        result = delete_task(db_session, parent_id)
         assert result is True
 
-        # Проверяем что задача удалена
-        assert get_task(db_session, task1["id"]) is None
+        assert get_task(db_session, parent_id) is None
 
-        # Проверяем что иерархические связи удалены
         hierarchies = db_session.query(TaskHierarchyDB).filter(
-            TaskHierarchyDB.parent_id == task1["id"]
+            TaskHierarchyDB.parent_id == parent_id
         ).all()
         assert len(hierarchies) == 0
 
-        # Проверяем что дочерняя задача осталась
-        assert get_task(db_session, task2["id"]) is not None
+        assert get_task(db_session, child_id) is not None
 
     def test_delete_nonexistent_task(self, db_session: Session):
         """Тест удаления несуществующей задачи"""
@@ -1582,8 +1558,7 @@ class TestTaskFunctions:
         )
 
         created_task = create_task(db_session, task_data)
-        task_id = created_task["id"]
-
+        task_id = created_task.id
         # Назначаем пользователей
         result = assign_users_to_task(db_session, task_id, [assignee1.id, assignee2.id])
         assert result is True
@@ -1702,7 +1677,6 @@ class TestTaskFunctions:
         assert "total" in all_stats
 
     def test_create_task_hierarchy_function(self, db_session: Session):
-        """Тест функции create_task_hierarchy"""
         from crud.task import create_task, create_task_hierarchy
         from crud.user import create_user
         from schemas.task import TaskCreate
@@ -1715,7 +1689,6 @@ class TestTaskFunctions:
             role=UserRole.USER
         ))
 
-        # Создаем две задачи
         parent_task_data = TaskCreate(
             title="Parent Task",
             description="Parent",
@@ -1733,24 +1706,23 @@ class TestTaskFunctions:
         parent = create_task(db_session, parent_task_data)
         child = create_task(db_session, child_task_data)
 
-        # Создаем иерархию
-        hierarchy = create_task_hierarchy(db_session, parent["id"], child["id"])
+        parent_id = parent.id
+        child_id = child.id
+
+        hierarchy = create_task_hierarchy(db_session, parent_id, child_id)
 
         assert hierarchy is not None
-        assert hierarchy["parent_id"] == parent["id"]
-        assert hierarchy["child_id"] == child["id"]
+        assert hierarchy["parent_id"] == parent_id
+        assert hierarchy["child_id"] == child_id
         assert "created_at" in hierarchy
 
-        # Пытаемся создать дубликат
-        duplicate = create_task_hierarchy(db_session, parent["id"], child["id"])
-        assert duplicate is not None  # Должен вернуть существующую
+        duplicate = create_task_hierarchy(db_session, parent_id, child_id)
+        assert duplicate is not None
 
-        # Пытаемся создать с несуществующими задачами
-        invalid = create_task_hierarchy(db_session, 99999, child["id"])
+        invalid = create_task_hierarchy(db_session, 99999, child_id)
         assert invalid is None
 
     def test_get_task_hierarchy_function(self, db_session: Session):
-        """Тест функции get_task_hierarchy"""
         from crud.task import create_task, create_task_hierarchy, get_task_hierarchy
         from crud.user import create_user
         from schemas.task import TaskCreate
@@ -1763,7 +1735,6 @@ class TestTaskFunctions:
             role=UserRole.USER
         ))
 
-        # Создаем несколько задач
         tasks = []
         for i in range(3):
             task_data = TaskCreate(
@@ -1774,31 +1745,27 @@ class TestTaskFunctions:
             )
             tasks.append(create_task(db_session, task_data))
 
-        # Создаем иерархию: Task0 -> Task1 -> Task2
-        create_task_hierarchy(db_session, tasks[0]["id"], tasks[1]["id"])
-        create_task_hierarchy(db_session, tasks[1]["id"], tasks[2]["id"])
+        ids = [task.id for task in tasks]
 
-        # Получаем иерархию для Task1 (посредник)
-        hierarchy = get_task_hierarchy(db_session, tasks[1]["id"])
+        create_task_hierarchy(db_session, ids[0], ids[1])
+        create_task_hierarchy(db_session, ids[1], ids[2])
+
+        hierarchy = get_task_hierarchy(db_session, ids[1])
 
         assert hierarchy is not None
         assert "task" in hierarchy
         assert "parents" in hierarchy
         assert "children" in hierarchy
 
-        # Task1 должен иметь Task0 как родителя
         assert len(hierarchy["parents"]) == 1
-        assert hierarchy["parents"][0]["id"] == tasks[0]["id"]
+        assert hierarchy["parents"][0]["id"] == ids[0]
 
-        # Task1 должен иметь Task2 как ребенка
         assert len(hierarchy["children"]) == 1
-        assert hierarchy["children"][0]["id"] == tasks[2]["id"]
+        assert hierarchy["children"][0]["id"] == ids[2]
 
-        # Для Task0 не должно быть родителей
-        hierarchy_task0 = get_task_hierarchy(db_session, tasks[0]["id"])
+        hierarchy_task0 = get_task_hierarchy(db_session, ids[0])
         assert len(hierarchy_task0["parents"]) == 0
         assert len(hierarchy_task0["children"]) == 1
 
-        # Для несуществующей задачи
         invalid_hierarchy = get_task_hierarchy(db_session, 99999)
         assert invalid_hierarchy == {}

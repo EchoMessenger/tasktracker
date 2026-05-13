@@ -1,4 +1,3 @@
-# tests/integration/test_tasks_endpoints.py
 import pytest
 import uuid
 from fastapi.testclient import TestClient
@@ -14,18 +13,12 @@ from crud.user import create_user as crud_create_user
 from crud.task import create_task as crud_create_task, get_task, task_to_dict
 
 
-# УДАЛЁН весь блок с app.dependency_overrides = {} и перебором маршрутов
-# override делается в conftest.py через autouse фикстуры
-
-
 @pytest.fixture
 def client():
     """Фикстура для тестового клиента"""
     with TestClient(app) as test_client:
         yield test_client
 
-
-# УДАЛЕНА фикстура sample_user — используется из conftest.py (с ролью ADMIN)
 
 
 @pytest.fixture
@@ -131,7 +124,6 @@ def test_get_task_not_found(client):
 
 
 def test_update_task_status_success(client, db_session: Session, sample_user):
-    """Успешное обновление статуса задачи"""
     task = TaskDB(
         title="Task for Status Update",
         description="Will update status",
@@ -146,12 +138,12 @@ def test_update_task_status_success(client, db_session: Session, sample_user):
     db_session.add(assignment)
     db_session.commit()
 
+    task_id = task.id
+
     response = client.patch(
-        f"/v2/tasks/{task.id}/status",
+        f"/v2/tasks/{task_id}/status",
         json={"status": "in_progress"}
     )
-
-    print(f"\nPATCH /v2/tasks/{task.id}/status - Status: {response.status_code}")
 
     assert response.status_code == 200
     data = response.json()
